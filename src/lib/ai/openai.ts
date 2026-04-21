@@ -4,23 +4,35 @@ import { SUMMARIZE_PROMPT } from './prompts';
 
 export class OpenAIProvider implements AIProvider {
   private client: OpenAI;
+  private activeModelId: string = 'gpt-4o-mini';
 
   constructor() {
     this.client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
   }
 
-  getModelName(tier: 'fast' | 'deep'): string {
-    return 'gpt-4o-mini';
+  setActiveModel(modelId: string): void {
+    this.activeModelId = modelId;
   }
 
-  async summarize(content: string, url: string): Promise<SignalAnalysis> {
+  getModelName(_tier: 'fast' | 'deep'): string {
+    return this.activeModelId;
+  }
+
+  async summarize(content: string, url: string, customPrompt?: string): Promise<SignalAnalysis> {
+    const prompt = customPrompt || SUMMARIZE_PROMPT;
+    const userContent = url
+      ? `URL: ${url}\n\nContent:\n${content.substring(0, 15000)}`
+      : `Content:\n${content.substring(0, 15000)}`;
+
+    console.log(`[openai] Summarize using model: ${this.activeModelId}`);
+
     const response = await this.client.chat.completions.create({
-      model: this.getModelName('fast'),
+      model: this.activeModelId,
       messages: [
-        { role: 'system', content: SUMMARIZE_PROMPT },
+        { role: 'system', content: prompt },
         {
           role: 'user',
-          content: `URL: ${url}\n\nContent:\n${content.substring(0, 15000)}`,
+          content: userContent,
         },
       ],
       response_format: { type: 'json_object' },
@@ -41,8 +53,10 @@ export class OpenAIProvider implements AIProvider {
     messages: Message[],
     systemContext: string
   ): AsyncGenerator<string, void, unknown> {
+    console.log(`[openai] Chat using model: ${this.activeModelId}`);
+
     const stream = await this.client.chat.completions.create({
-      model: this.getModelName('deep'),
+      model: this.activeModelId,
       stream: true,
       messages: [
         { role: 'system', content: systemContext },

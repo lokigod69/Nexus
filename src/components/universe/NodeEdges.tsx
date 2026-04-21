@@ -2,7 +2,6 @@
 
 import { useMemo } from 'react';
 import { Line } from '@react-three/drei';
-import * as THREE from 'three';
 import type { Signal } from '@/types';
 import { getCategoryColor } from '@/lib/utils/categories';
 
@@ -20,18 +19,14 @@ interface NodeEdgesProps {
   categoryFilter: string | undefined;
 }
 
-function blendColors(c1: string, c2: string): string {
-  const color1 = new THREE.Color(c1);
-  const color2 = new THREE.Color(c2);
-  return new THREE.Color().lerpColors(color1, color2, 0.5).getStyle();
-}
-
 export function NodeEdges({ signals, edges, hoveredId, selectedId, categoryFilter }: NodeEdgesProps) {
   const signalMap = useMemo(() => {
     const map = new Map<string, Signal>();
     signals.forEach(s => map.set(s.id, s));
     return map;
   }, [signals]);
+
+  const hasInteraction = hoveredId !== null || selectedId !== null;
 
   const renderedEdges = useMemo(() => {
     return edges.map(edge => {
@@ -40,12 +35,13 @@ export function NodeEdges({ signals, edges, hoveredId, selectedId, categoryFilte
       if (!source || !target) return null;
       if (source.posX == null || target.posX == null) return null;
 
-      // If category filter active, only show edges between matching nodes
+      // If category filter active, only show edges where at least one node matches
       if (categoryFilter) {
         if (source.category !== categoryFilter && target.category !== categoryFilter) return null;
       }
 
-      const color = blendColors(getCategoryColor(source.category), getCategoryColor(target.category));
+      // Use source node's category color
+      const color = getCategoryColor(source.category);
       const isHighlighted =
         hoveredId === edge.source || hoveredId === edge.target ||
         selectedId === edge.source || selectedId === edge.target;
@@ -57,8 +53,8 @@ export function NodeEdges({ signals, edges, hoveredId, selectedId, categoryFilte
           [target.posX!, target.posY ?? 0, target.posZ ?? 0] as [number, number, number],
         ],
         color,
-        opacity: isHighlighted ? 0.6 : 0.15,
-        lineWidth: isHighlighted ? 1.5 : 1.0,
+        opacity: isHighlighted ? 0.5 : (hasInteraction ? 0.05 : 0.2),
+        lineWidth: 0.5 + edge.score * 1.5,
       };
     }).filter(Boolean) as Array<{
       key: string;
@@ -67,7 +63,7 @@ export function NodeEdges({ signals, edges, hoveredId, selectedId, categoryFilte
       opacity: number;
       lineWidth: number;
     }>;
-  }, [edges, signalMap, hoveredId, selectedId, categoryFilter]);
+  }, [edges, signalMap, hoveredId, selectedId, categoryFilter, hasInteraction]);
 
   return (
     <group>

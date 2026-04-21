@@ -1,4 +1,6 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Nunito:wght@400;500;600&family=Quicksand:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Outfit:wght@400;500;600&display=swap');
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
 
 @theme inline {
   /* Backgrounds */
@@ -51,6 +53,12 @@ html, body {
   margin: 0;
   background-color: var(--color-void);
   color: var(--color-text-primary);
+}
+
+/* Ensure all interactive elements have pointer cursor */
+button:not(:disabled),
+[role="button"]:not(:disabled) {
+  cursor: pointer;
 }
 
 /* Custom scrollbar for dark theme */
@@ -138,4 +146,91 @@ html, body {
 
 .snow-particle {
   animation: snowflake ease-in-out infinite;
+}
+
+@keyframes reanalyze-pulse {
+  0%, 100% { border-left-color: inherit; opacity: 1; }
+  50% { border-left-color: rgba(255,255,255,0.25); opacity: 0.85; }
+}
+
+/* === Visual Overhaul: Dark Cosmic Aesthetic === */
+
+/* Border glow rotation */
+@property --glow-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes glowRotate {
+  to { --glow-angle: 360deg; }
+}
+
+/* Date separator gradient line */
+.date-line-gradient {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.08) 30%,
+    rgba(255, 255, 255, 0.08) 70%,
+    transparent
+  );
+}
+
+/* NEXUS logo text glow */
+.nexus-logo-glow {
+  text-shadow: 0 0 20px rgba(0, 255, 163, 0.15);
+}
+
+/* Single-column feed container */
+.feed-container {
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 1000px) {
+  .feed-container {
+    max-width: 600px;
+  }
+}
+@media (max-width: 600px) {
+  .feed-container {
+    max-width: 100%;
+    padding: 16px 12px;
+  }
+}
+
+/* Feed card hover transition */
+.feed-card {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.feed-card:hover {
+  transform: translateY(-2px) scale(1.015);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.feed-card:hover > div:last-child {
+  background: linear-gradient(90deg, var(--feed-card-wash, transparent) 0%, transparent 30%), rgba(255,255,255,0.05) !important;
+  border-color: rgba(255,255,255,0.12) !important;
+}
+
+/* Signal modal entrance animations */
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalSlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.signal-modal-overlay {
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+.signal-modal-body {
+  animation: modalSlideUp 0.25s ease-out;
 }

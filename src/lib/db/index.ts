@@ -1,16 +1,29 @@
-import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { createClient } from '@libsql/client';
+import { drizzle } from 'drizzle-orm/libsql';
 import * as schema from './schema';
-import path from 'path';
-import fs from 'fs';
 
-const DB_PATH = process.env.DATABASE_PATH || './data/nexus.db';
+// Support both cloud (Turso) and local (file) SQLite
+const isCloud = !!process.env.TURSO_DATABASE_URL;
 
-function ensureTables(sqlite: Database.Database) {
-  sqlite.exec(`
+const client = createClient(
+  isCloud
+    ? {
+        url: process.env.TURSO_DATABASE_URL!,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      }
+    : {
+        url: `file:${process.env.DATABASE_PATH || './data/nexus.db'}`,
+      }
+);
+
+const db = drizzle(client, { schema });
+
+// Ensure tables exist (runs on first connection)
+async function ensureTables() {
+  await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS signals (
       id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
-      url TEXT NOT NULL UNIQUE,
+      url TEXT UNIQUE,
       title TEXT NOT NULL,
       summary TEXT,
       key_takeaway TEXT,
@@ -102,31 +115,40 @@ function ensureTables(sqlite: Database.Database) {
       fetched_at TEXT DEFAULT CURRENT_TIMESTAMP,
       expires_at TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS conductor_conversations (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+      title TEXT,
+      ai_provider TEXT,
+      ai_model TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS conductor_messages (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+      conversation_id TEXT NOT NULL REFERENCES conductor_conversations(id) ON DELETE CASCADE,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      metadata TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS conductor_memory (
+      id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(8)))),
+      category TEXT NOT NULL DEFAULT 'general',
+      fact TEXT NOT NULL,
+      source TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    );
   `);
 }
 
-function getDb() {
-  // Check globalThis for existing connection (survives HMR)
-  const globalAny = globalThis as any;
-  if (globalAny.__nexusDb) return globalAny.__nexusDb;
+// Run table creation on startup
+const _initPromise = ensureTables().catch((err) => {
+  console.error('Failed to initialize database tables:', err);
+});
 
-  // Ensure data directory exists
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-
-  const sqlite = new Database(DB_PATH);
-  sqlite.pragma('journal_mode = WAL');
-  sqlite.pragma('foreign_keys = ON');
-
-  // Create tables if they don't exist (no migrations needed)
-  ensureTables(sqlite);
-
-  const db = drizzle(sqlite, { schema });
-  globalAny.__nexusDb = db;
-  return db;
-}
-
-export const db = getDb();
+export { db, _initPromise };
 export type DbType = typeof db;

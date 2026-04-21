@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const aiProvider = getAIProvider();
+    const aiProvider = await getAIProvider();
     const analysis = await aiProvider.summarize(content, url || '');
 
     return NextResponse.json(analysis);

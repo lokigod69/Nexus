@@ -9,7 +9,7 @@ const EDGE_THRESHOLD = 0.70;
 
 export async function GET() {
   try {
-    const allSignals = db
+    const allSignals = await db
       .select({
         id: signals.id,
         embedding: signals.embedding,

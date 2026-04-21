@@ -23,7 +23,7 @@ export function QRCodePanel({ url, onClose }: QRCodePanelProps) {
         </span>
         <button
           onClick={onClose}
-          className="text-text-muted hover:text-text-primary transition-colors"
+          className="cursor-pointer text-text-muted hover:text-text-primary transition-colors"
         >
           <X size={14} />
         </button>

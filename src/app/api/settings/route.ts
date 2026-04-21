@@ -1,10 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllSettings, setSetting } from '@/lib/db/queries';
+import {
+  getAvailableProviders,
+  getAvailableModels,
+  getAnalysisModelId,
+  getChatModelId,
+  getModelById,
+} from '@/lib/ai/provider';
 
 export async function GET() {
   try {
     const settings = await getAllSettings();
-    return NextResponse.json(settings);
+
+    const availableProviders = getAvailableProviders();
+    const availableModels = getAvailableModels();
+    const analysisModelId = await getAnalysisModelId();
+    const chatModelId = await getChatModelId();
+    const analysisModel = getModelById(analysisModelId);
+    const chatModel = getModelById(chatModelId);
+
+    return NextResponse.json({
+      ...settings,
+      _providers: {
+        available: availableProviders,
+      },
+      _models: {
+        available: availableModels,
+        analysisModelId,
+        chatModelId,
+        analysisModel: analysisModel || null,
+        chatModel: chatModel || null,
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to fetch settings';
     return NextResponse.json({ error: message }, { status: 500 });
@@ -26,7 +53,26 @@ export async function PUT(request: NextRequest) {
     }
 
     const settings = await getAllSettings();
-    return NextResponse.json(settings);
+    const availableProviders = getAvailableProviders();
+    const availableModels = getAvailableModels();
+    const analysisModelId = await getAnalysisModelId();
+    const chatModelId = await getChatModelId();
+    const analysisModel = getModelById(analysisModelId);
+    const chatModel = getModelById(chatModelId);
+
+    return NextResponse.json({
+      ...settings,
+      _providers: {
+        available: availableProviders,
+      },
+      _models: {
+        available: availableModels,
+        analysisModelId,
+        chatModelId,
+        analysisModel: analysisModel || null,
+        chatModel: chatModel || null,
+      },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Failed to update settings';
     return NextResponse.json({ error: message }, { status: 500 });

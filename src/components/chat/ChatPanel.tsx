@@ -13,7 +13,7 @@ export function ChatPanel({ signalId }: { signalId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [streamText, setStreamText] = useState('');
-  const [provider, setProvider] = useState<AIProviderType>('anthropic');
+  const [provider, setProvider] = useState<AIProviderType>('openrouter');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 

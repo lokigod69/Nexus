@@ -30,7 +30,7 @@ export function QuoteDisplay({ quotes }: QuoteDisplayProps) {
 
   useEffect(() => {
     if (quotes.length <= 1) return;
-    const interval = setInterval(cycle, 5000);
+    const interval = setInterval(cycle, 10000);
     return () => clearInterval(interval);
   }, [cycle, quotes.length]);
 

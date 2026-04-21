@@ -8,7 +8,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
 
 export function semanticSearch(
   queryVector: number[],
-  allSignals: { id: string; embedding: Buffer | null }[],
+  allSignals: { id: string; embedding: unknown }[],
   topK: number = 10
 ): { id: string; score: number }[] {
   return allSignals
@@ -23,7 +23,7 @@ export function semanticSearch(
 
 export function findRelatedSignals(
   signalId: string,
-  allSignals: { id: string; embedding: Buffer | null }[],
+  allSignals: { id: string; embedding: unknown }[],
   topK: number = 5,
   minScore: number = 0.65
 ): { id: string; score: number }[] {

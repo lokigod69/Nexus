@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useSignalStore } from '@/stores/signalStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -8,9 +8,12 @@ import { StarField } from './StarField';
 import { SignalNode } from './SignalNode';
 import { NodeEdges } from './NodeEdges';
 import { CameraController } from './CameraController';
+import type { CameraControllerHandle } from './CameraController';
+import type { Signal } from '@/types';
 import { ClusterLabels } from './ClusterLabels';
 import { UniverseHUD } from './UniverseHUD';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
+import * as THREE from 'three';
 
 interface Edge {
   source: string;
@@ -19,21 +22,45 @@ interface Edge {
 }
 
 export function UniverseView() {
-  const signals = useSignalStore(s => s.signals);
   const selectedSignalId = useSignalStore(s => s.selectedSignalId);
   const selectSignal = useSignalStore(s => s.selectSignal);
   const filters = useSignalStore(s => s.filters);
   const setFilters = useSignalStore(s => s.setFilters);
-  const fetchSignals = useSignalStore(s => s.fetchSignals);
   const toggleDetailPanel = useUIStore(s => s.toggleDetailPanel);
 
+  const [universeSignals, setUniverseSignals] = useState<Signal[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [recomputing, setRecomputing] = useState(false);
+  const cameraRef = useRef<CameraControllerHandle>(null);
 
-  // Refetch signals on mount to get fresh positions (UMAP may have updated after initial fetch)
+  // Fetch ALL signals (unfiltered) for the universe — independent of sidebar filters
   useEffect(() => {
-    fetchSignals();
+    async function fetchAllForUniverse() {
+      try {
+        const res = await fetch('/api/signals?limit=10000');
+        if (res.ok) {
+          const data = await res.json();
+          setUniverseSignals(data.signals || []);
+        }
+      } catch {
+        // silently fail
+      }
+    }
+    fetchAllForUniverse();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Escape key deselects node and closes detail panel
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedSignalId) {
+        selectSignal(null);
+        toggleDetailPanel(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSignalId, selectSignal, toggleDetailPanel]);
 
   // Fetch edges from API
   useEffect(() => {
@@ -48,19 +75,47 @@ export function UniverseView() {
         // Edges are non-critical, silently fail
       }
     }
-    if (signals.length > 0) {
+    if (universeSignals.length > 0) {
       fetchEdges();
     }
-  }, [signals.length]);
+  }, [universeSignals.length]);
 
   const signalsWithPositions = useMemo(
-    () => signals.filter(s => s.posX != null),
-    [signals]
+    () => universeSignals.filter(s => s.posX != null),
+    [universeSignals]
   );
 
+  // Compute bounding box → default camera position that fits all nodes
+  const { defaultPosition, defaultLookAt } = useMemo(() => {
+    if (signalsWithPositions.length === 0) {
+      return {
+        defaultPosition: new THREE.Vector3(0, 40, 120),
+        defaultLookAt: new THREE.Vector3(0, 0, 0),
+      };
+    }
+
+    const box = new THREE.Box3();
+    signalsWithPositions.forEach(s => {
+      box.expandByPoint(new THREE.Vector3(s.posX!, s.posY ?? 0, s.posZ ?? 0));
+    });
+
+    const centroid = new THREE.Vector3();
+    box.getCenter(centroid);
+
+    const sphere = new THREE.Sphere();
+    box.getBoundingSphere(sphere);
+
+    const distance = Math.max(120, sphere.radius * 2.5);
+
+    return {
+      defaultPosition: new THREE.Vector3(centroid.x, centroid.y + distance * 0.3, centroid.z + distance),
+      defaultLookAt: centroid,
+    };
+  }, [signalsWithPositions]);
+
   const selectedSignal = useMemo(
-    () => signals.find(s => s.id === selectedSignalId) ?? null,
-    [signals, selectedSignalId]
+    () => universeSignals.find(s => s.id === selectedSignalId) ?? null,
+    [universeSignals, selectedSignalId]
   );
 
   const handleSelect = useCallback((id: string) => {
@@ -73,13 +128,6 @@ export function UniverseView() {
     }
   }, [selectedSignalId, selectSignal, toggleDetailPanel]);
 
-  const handleCanvasClick = useCallback((e: any) => {
-    // Only deselect if clicking empty space (not a node)
-    if (e.target === e.currentTarget || (e.delta && e.delta < 2)) {
-      // This fires from the Canvas pointerMissed
-    }
-  }, []);
-
   const handlePointerMissed = useCallback(() => {
     selectSignal(null);
     toggleDetailPanel(false);
@@ -89,16 +137,48 @@ export function UniverseView() {
     setFilters({ category });
   }, [setFilters]);
 
+  const handleRecenter = useCallback(() => {
+    cameraRef.current?.recenter();
+  }, []);
+
+  const handleRecompute = useCallback(async () => {
+    setRecomputing(true);
+    try {
+      const res = await fetch('/api/embedding/recompute', { method: 'POST' });
+      if (res.ok) {
+        // Refetch all signals for the universe
+        const sigRes = await fetch('/api/signals?limit=10000');
+        if (sigRes.ok) {
+          const data = await sigRes.json();
+          setUniverseSignals(data.signals || []);
+        }
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setRecomputing(false);
+    }
+  }, []);
+
   return (
     <div className="relative w-full h-full">
+      {signalsWithPositions.length === 0 ? (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center space-y-2">
+            <p className="text-text-muted text-sm font-mono">No signals with positions yet</p>
+            <p className="text-text-secondary text-xs font-mono">Add signals and compute embeddings to populate the universe</p>
+          </div>
+        </div>
+      ) : null}
+
       <Canvas
-        camera={{ position: [0, 30, 80], fov: 60, near: 0.1, far: 500 }}
+        camera={{ position: [defaultPosition.x, defaultPosition.y, defaultPosition.z], fov: 60, near: 0.1, far: 1000 }}
         onPointerMissed={handlePointerMissed}
         gl={{ antialias: true, alpha: false }}
         style={{ background: '#08080d' }}
       >
         <color attach="background" args={['#08080d']} />
-        <fog attach="fog" args={['#08080d', 80, 200]} />
+        <fog attach="fog" args={['#08080d', 150, 400]} />
         <ambientLight intensity={0.15} />
         <pointLight position={[50, 50, 50]} intensity={0.3} color="#7b8aff" />
         <pointLight position={[-50, -30, -50]} intensity={0.2} color="#ff6bff" />
@@ -106,9 +186,12 @@ export function UniverseView() {
         <StarField />
 
         <CameraController
+          ref={cameraRef}
           selectedSignal={selectedSignal}
           signals={signalsWithPositions}
           categoryFilter={filters.category}
+          defaultPosition={defaultPosition}
+          defaultLookAt={defaultLookAt}
         />
 
         <ClusterLabels
@@ -153,6 +236,9 @@ export function UniverseView() {
         signalCount={signalsWithPositions.length}
         categoryFilter={filters.category}
         onCategoryClick={handleCategoryClick}
+        onRecenter={handleRecenter}
+        onRecompute={handleRecompute}
+        recomputing={recomputing}
       />
     </div>
   );

@@ -32,6 +32,13 @@ export function useKeyboardShortcuts() {
         return;
       }
 
+      // Mod+Shift+N: Capture Brain Dump
+      if (mod && e.shiftKey && e.key === 'N') {
+        e.preventDefault();
+        toggleCaptureModal(true, 'brain_dump');
+        return;
+      }
+
       // Mod+N: Capture URL (always works)
       if (mod && e.key === 'n') {
         e.preventDefault();

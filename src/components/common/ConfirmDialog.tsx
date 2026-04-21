@@ -14,7 +14,11 @@ export function ConfirmDialog({
   onCancel: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onCancel}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={(e) => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) return;
+        if (e.target === e.currentTarget) onCancel();
+      }}>
       <div
         className="bg-surface border border-border-subtle rounded-lg p-6 max-w-sm w-full mx-4"
         onClick={(e) => e.stopPropagation()}
@@ -24,13 +28,13 @@ export function ConfirmDialog({
         <div className="flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary border border-border-subtle rounded transition-colors"
+            className="cursor-pointer px-4 py-2 text-sm text-text-secondary hover:text-text-primary border border-border-subtle rounded transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onConfirm}
-            className="px-4 py-2 text-sm text-white bg-danger rounded hover:opacity-90 transition-opacity"
+            className="cursor-pointer px-4 py-2 text-sm text-white bg-danger rounded hover:opacity-90 transition-opacity"
           >
             {confirmLabel}
           </button>

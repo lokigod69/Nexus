@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, Star, Archive, Trash2, ExternalLink, Download, QrCode, GitFork, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Star, Archive, Trash2, ExternalLink, Download, QrCode, GitFork, AlertTriangle, RefreshCw } from 'lucide-react';
 import { Star as StarIcon } from 'lucide-react';
 import { useSignalStore } from '@/stores/signalStore';
 import { useUIStore } from '@/stores/uiStore';
@@ -30,7 +30,9 @@ export function SignalDetail({ signalId }: { signalId: string }) {
   const updateSignal = useSignalStore(s => s.updateSignal);
   const deleteSignal = useSignalStore(s => s.deleteSignal);
   const selectSignal = useSignalStore(s => s.selectSignal);
+  const fetchSignals = useSignalStore(s => s.fetchSignals);
   const toggleDetailPanel = useUIStore(s => s.toggleDetailPanel);
+  const setViewMode = useUIStore(s => s.setViewMode);
 
   useEffect(() => {
     const fetchSignal = async () => {
@@ -84,10 +86,15 @@ export function SignalDetail({ signalId }: { signalId: string }) {
     if (!signal) return;
     setReanalyzing(true);
     try {
-      const res = await fetch(`/api/signals/${signal.id}/reanalyze`, { method: 'POST' });
+      const res = await fetch(`/api/signals/${signal.id}/reanalyze`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rescrape: true }),
+      });
       if (res.ok) {
         const updated = await res.json();
         setSignal(updated);
+        fetchSignals();
         toast.success('Re-analysis complete');
       } else {
         const err = await res.json();
@@ -117,17 +124,25 @@ export function SignalDetail({ signalId }: { signalId: string }) {
     <div className="w-[400px] bg-surface border-l border-border-subtle shrink-0 flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-border-subtle">
-        <button onClick={handleClose} className="text-text-secondary hover:text-text-primary transition-colors">
+        <button onClick={handleClose} className="cursor-pointer text-text-secondary hover:text-text-primary transition-colors" title="Close detail panel">
           <ArrowLeft size={16} />
         </button>
         <div className="flex items-center gap-2">
-          <button onClick={handleStar} className={`transition-colors ${signal.status === 'starred' ? 'text-warning' : 'text-text-muted hover:text-warning'}`}>
+          <button onClick={handleStar} className={`cursor-pointer transition-colors ${signal.status === 'starred' ? 'text-warning' : 'text-text-muted hover:text-warning'}`} title={signal.status === 'starred' ? 'Unstar this signal' : 'Star this signal'}>
             <Star size={16} fill={signal.status === 'starred' ? 'currentColor' : 'none'} />
           </button>
-          <button onClick={handleArchive} className={`transition-colors ${signal.status === 'archived' ? 'text-text-muted' : 'text-text-muted hover:text-text-secondary'}`}>
+          <button
+            onClick={handleReanalyze}
+            disabled={reanalyzing}
+            className={`cursor-pointer transition-colors text-text-muted hover:text-accent-primary ${reanalyzing ? 'animate-spin' : ''}`}
+            title="Re-analyze with AI"
+          >
+            <RefreshCw size={16} />
+          </button>
+          <button onClick={handleArchive} className={`cursor-pointer transition-colors ${signal.status === 'archived' ? 'text-text-muted' : 'text-text-muted hover:text-text-secondary'}`} title={signal.status === 'archived' ? 'Unarchive this signal' : 'Archive this signal'}>
             <Archive size={16} />
           </button>
-          <button onClick={() => setShowDeleteConfirm(true)} className="text-text-muted hover:text-danger transition-colors">
+          <button onClick={() => setShowDeleteConfirm(true)} className="cursor-pointer text-text-muted hover:text-danger transition-colors" title="Delete this signal">
             <Trash2 size={16} />
           </button>
         </div>
@@ -166,7 +181,9 @@ export function SignalDetail({ signalId }: { signalId: string }) {
 
           {/* Meta */}
           <div className="flex items-center gap-2 text-xs font-mono text-text-muted">
-            {(signal.enrichments?.favicon as { url: string; source: string } | undefined)?.url && (
+            {signal.source === 'brain_dump' ? (
+              <span className="text-base">🧠</span>
+            ) : (signal.enrichments?.favicon as { url: string; source: string } | undefined)?.url ? (
               <img
                 src={(signal.enrichments!.favicon as { url: string; source: string }).url}
                 alt=""
@@ -176,8 +193,8 @@ export function SignalDetail({ signalId }: { signalId: string }) {
                 style={{ width: 24, height: 24 }}
                 onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
               />
-            )}
-            <span>{signal.source}</span>
+            ) : null}
+            <span>{signal.source === 'brain_dump' ? 'BRAIN DUMP' : signal.source}</span>
             <span>·</span>
             <span>{getAgeLabel(signal.createdAt)}</span>
             <span className="ml-auto"><StatusBadge status={signal.status} /></span>
@@ -213,8 +230,16 @@ export function SignalDetail({ signalId }: { signalId: string }) {
             </div>
           )}
 
+          {/* Brain dump full text */}
+          {signal.source === 'brain_dump' && signal.rawScrapedContent && (
+            <div>
+              <h4 className="text-[10px] font-mono text-text-muted uppercase tracking-wider mb-1">Original Thought</h4>
+              <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{signal.rawScrapedContent}</p>
+            </div>
+          )}
+
           {/* Raw content fallback when no analysis */}
-          {!signal.summary && !signal.keyTakeaway && signal.rawScrapedContent && (
+          {signal.source !== 'brain_dump' && !signal.summary && !signal.keyTakeaway && signal.rawScrapedContent && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-[10px] font-mono text-text-muted uppercase tracking-wider">Raw Content</h4>
@@ -288,7 +313,7 @@ export function SignalDetail({ signalId }: { signalId: string }) {
             <div className="flex items-center justify-between mb-1">
               <h4 className="text-[10px] font-mono text-text-muted uppercase tracking-wider">My Notes</h4>
               {!editingNote && (
-                <button onClick={() => setEditingNote(true)} className="text-[10px] font-mono text-text-muted hover:text-accent-primary">Edit</button>
+                <button onClick={() => setEditingNote(true)} className="cursor-pointer text-[10px] font-mono text-text-muted hover:text-accent-primary" title="Edit note">Edit</button>
               )}
             </div>
             {editingNote ? (
@@ -301,8 +326,8 @@ export function SignalDetail({ signalId }: { signalId: string }) {
                   autoFocus
                 />
                 <div className="flex gap-2 mt-1">
-                  <button onClick={handleNoteSave} className="text-xs text-accent-primary hover:underline">Save</button>
-                  <button onClick={() => { setEditingNote(false); setNoteValue(signal.note || ''); }} className="text-xs text-text-muted hover:underline">Cancel</button>
+                  <button onClick={handleNoteSave} className="cursor-pointer text-xs text-accent-primary hover:underline">Save</button>
+                  <button onClick={() => { setEditingNote(false); setNoteValue(signal.note || ''); }} className="cursor-pointer text-xs text-text-muted hover:underline">Cancel</button>
                 </div>
               </div>
             ) : (
@@ -312,24 +337,49 @@ export function SignalDetail({ signalId }: { signalId: string }) {
 
           {/* Actions */}
           <div className="flex gap-2 relative">
-            <a
-              href={signal.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors"
+            {signal.url && (
+              <a
+                href={signal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="cursor-pointer flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors"
+              >
+                <ExternalLink size={12} /> {(() => { try { return new URL(signal.url).hostname.replace('www.', ''); } catch { return 'Open Original'; } })()}
+              </a>
+            )}
+            <button
+              onClick={() => {
+                fetch('/api/export/obsidian-sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ signalId: signal.id }),
+                })
+                  .then(r => r.ok ? r.json() : Promise.reject())
+                  .then(() => toast.success('Exported to Obsidian'))
+                  .catch(() => toast.error('Export failed'));
+              }}
+              className="cursor-pointer flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors"
+              title="Export to Obsidian"
             >
-              <ExternalLink size={12} /> {(() => { try { return new URL(signal.url).hostname.replace('www.', ''); } catch { return 'Open Original'; } })()}
-            </a>
-            <button className="flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors">
-              <Download size={12} /> Export
+              <Download size={12} /> Export to Obsidian
             </button>
             <button
-              onClick={() => setShowQRCode(prev => !prev)}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors"
+              onClick={() => { setViewMode('feed'); handleClose(); }}
+              className="cursor-pointer flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors"
+              title="Open in Feed view"
             >
-              <QrCode size={12} /> QR
+              Open in Feed
             </button>
-            {showQRCode && (
+            {signal.url && (
+              <button
+                onClick={() => setShowQRCode(prev => !prev)}
+                className="cursor-pointer flex items-center gap-1 px-3 py-1.5 text-xs font-mono border border-border-subtle rounded-lg text-text-secondary hover:text-text-primary hover:border-border-active transition-colors"
+                title="Show QR code"
+              >
+                <QrCode size={12} /> QR
+              </button>
+            )}
+            {showQRCode && signal.url && (
               <QRCodePanel url={signal.url} onClose={() => setShowQRCode(false)} />
             )}
           </div>

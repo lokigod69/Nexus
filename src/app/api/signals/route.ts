@@ -19,6 +19,8 @@ import {
 import { computePositions } from '@/lib/embedding/umap';
 import { detectSource, isValidUrl } from '@/lib/utils/url';
 import { runSignalEnrichments } from '@/lib/enrichment';
+import { BRAIN_DUMP_ANALYZE_PROMPT } from '@/lib/ai/prompts';
+import { exportSignalToObsidianWithRelated } from '@/lib/export/obsidian-sync';
 
 // --- UMAP debounce ---
 let umapTimeout: NodeJS.Timeout | null = null;
@@ -61,7 +63,7 @@ async function captureSingleSignal(
   if (!skipAnalysis) {
     try {
       console.log('[capture] Starting AI analysis for:', url);
-      const aiProvider = getAIProvider();
+      const aiProvider = await getAIProvider();
       analysis = await aiProvider.summarize(scraped.content, url);
       console.log('[capture] AI analysis succeeded, title:', analysis.title);
     } catch (err: any) {
@@ -99,7 +101,7 @@ async function captureSingleSignal(
     status: 'inbox',
     actionable: analysis?.actionable ? 1 : 0,
     note: note || null,
-    aiProvider: skipAnalysis ? null : (process.env.ANTHROPIC_API_KEY ? 'anthropic' : 'openai'),
+    aiProvider: skipAnalysis ? null : (process.env.OPENROUTER_KEY ? 'openrouter' : 'openai'),
     tags: analysis?.tags || [],
   });
 
@@ -111,9 +113,15 @@ async function captureSingleSignal(
     embeddingProvider.getDimension()
   );
 
-  // 6.5 Store OG image if available
+  // 6.5 Store scrape metadata as enrichments
   if (scraped.ogImage) {
     await upsertSignalEnrichment(signal.id!, 'og_image', { url: scraped.ogImage });
+  }
+  if (scraped.author) {
+    await upsertSignalEnrichment(signal.id!, 'author', { name: scraped.author });
+  }
+  if (scraped.publishedDate) {
+    await upsertSignalEnrichment(signal.id!, 'published_date', { date: scraped.publishedDate });
   }
 
   // 6.6 Run enrichments (non-blocking)
@@ -124,6 +132,100 @@ async function captureSingleSignal(
   // 7. Trigger debounced UMAP recompute
   debouncedRecompute();
 
+  // 8. Auto-export to Obsidian (fire-and-forget)
+  if (process.env.OBSIDIAN_VAULT_PATH) {
+    exportSignalToObsidianWithRelated(signal.id!).catch(err => {
+      console.warn('[obsidian-sync] Auto-export failed:', err instanceof Error ? err.message : err);
+    });
+  }
+
+  return { signal, analysisError };
+}
+
+// --- Capture a brain dump (no URL, no scrape) ---
+async function captureBrainDump(
+  content: string,
+  title?: string | null,
+  contentType?: string | null,
+  category?: string | null,
+  note?: string | null
+) {
+  // 1. AI analysis with brain dump prompt
+  let analysis = null;
+  let analysisError: string | null = null;
+  try {
+    console.log('[capture] Starting AI analysis for brain dump');
+    const aiProvider = await getAIProvider();
+    analysis = await aiProvider.summarize(content, '', BRAIN_DUMP_ANALYZE_PROMPT);
+    console.log('[capture] Brain dump AI analysis succeeded, title:', analysis.title);
+  } catch (err: any) {
+    analysisError = err.message || 'Unknown AI analysis error';
+    console.error('[capture] Brain dump AI analysis failed:', analysisError);
+  }
+
+  // 2. Compose embedding text and generate embedding
+  const embeddingText = composeEmbeddingText({
+    title: title || analysis?.title || 'Untitled thought',
+    summary: analysis?.summary || null,
+    keyTakeaway: analysis?.keyTakeaway || null,
+    extractedContent: analysis?.extractedContent || null,
+    rawScrapedContent: content,
+    note: note || null,
+    source: 'brain_dump',
+    tags: analysis?.tags || [],
+  });
+
+  const embeddingProvider = getEmbeddingProvider();
+  const vector = await embeddingProvider.embed(embeddingText);
+  const embeddingBlob = vectorToBlob(vector);
+
+  // 3. Create signal in DB
+  const signal = await createSignal({
+    url: null,
+    title: title || analysis?.title || 'Untitled thought',
+    summary: analysis?.summary || null,
+    keyTakeaway: analysis?.keyTakeaway || null,
+    extractedContent: analysis?.extractedContent || null,
+    extractedContentType: analysis?.extractedContentType || 'none',
+    rawScrapedContent: content,
+    category: category || analysis?.category || 'other',
+    contentType: contentType || analysis?.contentType || 'note',
+    source: 'brain_dump',
+    status: 'inbox',
+    actionable: analysis?.actionable ? 1 : 0,
+    note: note || null,
+    aiProvider: process.env.OPENROUTER_KEY ? 'openrouter' : 'openai',
+    tags: analysis?.tags || [],
+  });
+
+  // 4. Update embedding
+  await updateSignalEmbedding(
+    signal.id!,
+    embeddingBlob,
+    embeddingProvider.getModelName(),
+    embeddingProvider.getDimension()
+  );
+
+  // 5. Store suggested emoji as enrichment
+  if (analysis?.suggestedEmoji) {
+    await upsertSignalEnrichment(signal.id!, 'emoji', { emoji: analysis.suggestedEmoji });
+  }
+
+  // 6. Store book references as enrichment
+  if (analysis?.bookReferences && analysis.bookReferences.length > 0) {
+    await upsertSignalEnrichment(signal.id!, 'book_ref', analysis.bookReferences[0]);
+  }
+
+  // 7. Trigger debounced UMAP recompute
+  debouncedRecompute();
+
+  // 8. Auto-export to Obsidian (fire-and-forget)
+  if (process.env.OBSIDIAN_VAULT_PATH) {
+    exportSignalToObsidianWithRelated(signal.id!).catch(err => {
+      console.warn('[obsidian-sync] Auto-export failed:', err instanceof Error ? err.message : err);
+    });
+  }
+
   return { signal, analysisError };
 }
 
@@ -131,6 +233,15 @@ async function captureSingleSignal(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // Brain dump mode
+    if (body.source === 'brain_dump' && body.content) {
+      const { content, title, contentType, category, note } = body;
+      const { signal, analysisError } = await captureBrainDump(
+        content, title, contentType, category, note
+      );
+      return NextResponse.json({ ...signal, _analysisError: analysisError }, { status: 201 });
+    }
 
     // Bulk mode
     if (body.urls && Array.isArray(body.urls)) {
@@ -188,6 +299,7 @@ export async function GET(request: NextRequest) {
     const filters = {
       status: searchParams.get('status') || undefined,
       category: searchParams.get('category') || undefined,
+      tag: searchParams.get('tag') || undefined,
       search: searchParams.get('search') || undefined,
       sort: (searchParams.get('sort') as 'newest' | 'oldest' | 'starred') || undefined,
       limit: searchParams.get('limit')

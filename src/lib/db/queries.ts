@@ -9,6 +9,9 @@ import {
   signalEnrichments,
   enrichmentCache,
   settings,
+  conductorConversations,
+  conductorMessages,
+  conductorMemory,
 } from './schema';
 import type { Signal, SignalFilters } from '@/types';
 
@@ -27,7 +30,7 @@ type Transaction = any;
 async function fetchEnrichmentsForSignals(signalIds: string[]) {
   if (signalIds.length === 0) return new Map<string, Record<string, unknown>>();
 
-  const rows = db
+  const rows = await db
     .select()
     .from(signalEnrichments)
     .where(inArray(signalEnrichments.signalId, signalIds))
@@ -54,7 +57,7 @@ async function fetchEnrichmentsForSignals(signalIds: string[]) {
 async function fetchTagsForSignals(signalIds: string[]) {
   if (signalIds.length === 0) return new Map<string, { id: number; name: string; createdAt: string }[]>();
 
-  const rows = db
+  const rows = await db
     .select({
       signalId: signalTags.signalId,
       tagId: tags.id,
@@ -76,10 +79,33 @@ async function fetchTagsForSignals(signalIds: string[]) {
 }
 
 export async function getAllSignals(filters: SignalFilters = {}) {
-  const { status, category, search, sort = 'newest', limit = 50, offset = 0 } = filters;
+  const { status, category, tag, search, sort = 'newest', limit = 50, offset = 0 } = filters;
+
+  // If filtering by tag, we need to find matching signal IDs first
+  let tagFilteredIds: string[] | null = null;
+  if (tag) {
+    const tagRow = await db.select().from(tags).where(eq(tags.name, tag)).get();
+    if (!tagRow) {
+      return { signals: [], total: 0 };
+    }
+    const rows = await db
+      .select({ signalId: signalTags.signalId })
+      .from(signalTags)
+      .where(eq(signalTags.tagId, tagRow.id))
+      .all();
+    const ids = rows.map((r: { signalId: string }) => r.signalId);
+    if (ids.length === 0) {
+      return { signals: [], total: 0 };
+    }
+    tagFilteredIds = ids;
+  }
 
   // Build WHERE conditions
   const conditions: ReturnType<typeof eq>[] = [];
+
+  if (tagFilteredIds && tagFilteredIds.length > 0) {
+    conditions.push(inArray(signals.id, tagFilteredIds));
+  }
 
   if (status) {
     const statuses = status.split(',').map((s) => s.trim());
@@ -113,7 +139,7 @@ export async function getAllSignals(filters: SignalFilters = {}) {
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
   // Count total (without limit/offset)
-  const countResult = db
+  const countResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(signals)
     .where(whereClause)
@@ -136,7 +162,7 @@ export async function getAllSignals(filters: SignalFilters = {}) {
       break;
   }
 
-  const rows = db
+  const rows = await db
     .select()
     .from(signals)
     .where(whereClause)
@@ -162,10 +188,10 @@ export async function getAllSignals(filters: SignalFilters = {}) {
 }
 
 export async function getSignalById(id: string) {
-  const row = db.select().from(signals).where(eq(signals.id, id)).get();
+  const row = await db.select().from(signals).where(eq(signals.id, id)).get();
   if (!row) return null;
 
-  const tagRows = db
+  const tagRows = await db
     .select({
       id: tags.id,
       name: tags.name,
@@ -183,7 +209,7 @@ export async function getSignalById(id: string) {
 }
 
 export async function createSignal(data: {
-  url: string;
+  url: string | null;
   title: string;
   summary?: string | null;
   keyTakeaway?: string | null;
@@ -201,8 +227,8 @@ export async function createSignal(data: {
 }) {
   const { tags: tagNames, ...signalData } = data;
 
-  return db.transaction((tx: Transaction) => {
-    const inserted = tx
+  return db.transaction(async (tx: Transaction) => {
+    const inserted = await tx
       .insert(signals)
       .values(signalData)
       .returning()
@@ -213,16 +239,16 @@ export async function createSignal(data: {
     if (tagNames && tagNames.length > 0) {
       for (const tagName of tagNames) {
         // Upsert tag: insert or ignore
-        tx.run(sql`INSERT OR IGNORE INTO tags (name) VALUES (${tagName})`);
+        await tx.run(sql`INSERT OR IGNORE INTO tags (name) VALUES (${tagName})`);
 
-        const tag = tx
+        const tag = await tx
           .select()
           .from(tags)
           .where(eq(tags.name, tagName))
           .get();
 
         if (tag) {
-          tx.insert(signalTags)
+          await tx.insert(signalTags)
             .values({ signalId: inserted.id!, tagId: tag.id })
             .run();
 
@@ -243,7 +269,7 @@ export async function updateSignal(id: string, data: Partial<Signal>) {
   // Strip joined fields that aren't columns
   const { tags: _tags, ...updateData } = data as any;
 
-  const updated = db
+  const updated = await db
     .update(signals)
     .set({ ...updateData, updatedAt: sql`CURRENT_TIMESTAMP` })
     .where(eq(signals.id, id))
@@ -254,7 +280,7 @@ export async function updateSignal(id: string, data: Partial<Signal>) {
 }
 
 export async function deleteSignal(id: string) {
-  db.delete(signals).where(eq(signals.id, id)).run();
+  await db.delete(signals).where(eq(signals.id, id)).run();
 }
 
 // ============================================================
@@ -262,7 +288,7 @@ export async function deleteSignal(id: string) {
 // ============================================================
 
 export async function getConversation(signalId: string) {
-  const row = db
+  const row = await db
     .select()
     .from(conversations)
     .where(eq(conversations.signalId, signalId))
@@ -276,7 +302,7 @@ export async function createConversation(
   provider: string,
   model: string
 ) {
-  const inserted = db
+  const inserted = await db
     .insert(conversations)
     .values({
       signalId,
@@ -307,14 +333,14 @@ export async function addMessage(
   role: string,
   content: string
 ) {
-  const inserted = db
+  const inserted = await db
     .insert(messages)
     .values({ conversationId, role, content })
     .returning()
     .get();
 
   // Update conversation's updatedAt
-  db.update(conversations)
+  await db.update(conversations)
     .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
     .where(eq(conversations.id, conversationId))
     .run();
@@ -350,15 +376,15 @@ export async function getAllSignalEmbeddingsWithCategory() {
 }
 
 export async function getSignalByUrl(url: string) {
-  return db.select().from(signals).where(eq(signals.url, url)).get() ?? null;
+  return await db.select().from(signals).where(eq(signals.url, url)).get() ?? null;
 }
 
 export async function updateSignalPositions(
   positions: Map<string, { x: number; y: number; z: number }>
 ) {
-  db.transaction((tx: Transaction) => {
+  await db.transaction(async (tx: Transaction) => {
     for (const [id, pos] of positions) {
-      tx.update(signals)
+      await tx.update(signals)
         .set({
           posX: pos.x,
           posY: pos.y,
@@ -376,7 +402,7 @@ export async function updateSignalEmbedding(
   model: string,
   dim: number
 ) {
-  db.update(signals)
+  await db.update(signals)
     .set({
       embedding,
       embeddingModel: model,
@@ -395,7 +421,7 @@ export async function updateSignalEmbedding(
 // ============================================================
 
 export async function getSignalEnrichments(signalId: string): Promise<Record<string, unknown>> {
-  const rows = db
+  const rows = await db
     .select()
     .from(signalEnrichments)
     .where(eq(signalEnrichments.signalId, signalId))
@@ -421,8 +447,8 @@ export async function upsertSignalEnrichment(
   const jsonData = typeof data === 'string' ? data : JSON.stringify(data);
 
   // Atomic delete+insert within a transaction
-  db.transaction((tx: Transaction) => {
-    tx.delete(signalEnrichments)
+  await db.transaction(async (tx: Transaction) => {
+    await tx.delete(signalEnrichments)
       .where(
         and(
           eq(signalEnrichments.signalId, signalId),
@@ -431,7 +457,7 @@ export async function upsertSignalEnrichment(
       )
       .run();
 
-    tx.insert(signalEnrichments)
+    await tx.insert(signalEnrichments)
       .values({
         signalId,
         enrichmentType,
@@ -443,7 +469,7 @@ export async function upsertSignalEnrichment(
 }
 
 export async function getCacheEntry(key: string): Promise<unknown | null> {
-  const row = db
+  const row = await db
     .select()
     .from(enrichmentCache)
     .where(eq(enrichmentCache.key, key))
@@ -453,7 +479,7 @@ export async function getCacheEntry(key: string): Promise<unknown | null> {
 
   // Check expiration
   if (row.expiresAt && new Date(row.expiresAt) < new Date()) {
-    db.delete(enrichmentCache).where(eq(enrichmentCache.key, key)).run();
+    await db.delete(enrichmentCache).where(eq(enrichmentCache.key, key)).run();
     return null;
   }
 
@@ -467,9 +493,9 @@ export async function getCacheEntry(key: string): Promise<unknown | null> {
 export async function setCacheEntry(key: string, data: unknown, expiresAt: string) {
   const jsonData = typeof data === 'string' ? data : JSON.stringify(data);
 
-  db.delete(enrichmentCache).where(eq(enrichmentCache.key, key)).run();
+  await db.delete(enrichmentCache).where(eq(enrichmentCache.key, key)).run();
 
-  db.insert(enrichmentCache)
+  await db.insert(enrichmentCache)
     .values({
       key,
       data: jsonData,
@@ -479,17 +505,17 @@ export async function setCacheEntry(key: string, data: unknown, expiresAt: strin
 }
 
 export async function clearEnrichmentCache() {
-  db.delete(enrichmentCache).run();
-  db.delete(signalEnrichments).run();
+  await db.delete(enrichmentCache).run();
+  await db.delete(signalEnrichments).run();
 }
 
 export async function getEnrichmentCacheStats() {
-  const cacheCount = db
+  const cacheCount = await db
     .select({ count: sql<number>`count(*)` })
     .from(enrichmentCache)
     .get();
 
-  const enrichmentCount = db
+  const enrichmentCount = await db
     .select({ count: sql<number>`count(*)` })
     .from(signalEnrichments)
     .get();
@@ -505,7 +531,7 @@ export async function getEnrichmentCacheStats() {
 // ============================================================
 
 export async function getAllSettings(): Promise<Record<string, string>> {
-  const rows = db.select().from(settings).all();
+  const rows = await db.select().from(settings).all();
   const result: Record<string, string> = {};
   for (const row of rows) {
     result[row.key] = row.value;
@@ -513,9 +539,14 @@ export async function getAllSettings(): Promise<Record<string, string>> {
   return result;
 }
 
+export async function getSetting(key: string): Promise<string | null> {
+  const row = await db.select().from(settings).where(eq(settings.key, key)).get();
+  return row?.value ?? null;
+}
+
 export async function setSetting(key: string, value: string) {
-  db.delete(settings).where(eq(settings.key, key)).run();
-  db.insert(settings).values({ key, value }).run();
+  await db.delete(settings).where(eq(settings.key, key)).run();
+  await db.insert(settings).values({ key, value }).run();
 }
 
 // ============================================================
@@ -523,12 +554,12 @@ export async function setSetting(key: string, value: string) {
 // ============================================================
 
 export async function getSignalStats() {
-  const totalResult = db
+  const totalResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(signals)
     .get();
 
-  const freshResult = db
+  const freshResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(signals)
     .where(
@@ -536,13 +567,13 @@ export async function getSignalStats() {
     )
     .get();
 
-  const starredResult = db
+  const starredResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(signals)
     .where(eq(signals.status, 'starred'))
     .get();
 
-  const conversationsResult = db
+  const conversationsResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(conversations)
     .get();
@@ -553,4 +584,238 @@ export async function getSignalStats() {
     starred: starredResult?.count ?? 0,
     conversations: conversationsResult?.count ?? 0,
   };
+}
+
+// ============================================================
+// Conductor Conversations
+// ============================================================
+
+export async function createConductorConversation(
+  provider?: string,
+  model?: string,
+  title?: string
+) {
+  const inserted = await db
+    .insert(conductorConversations)
+    .values({
+      title: title || null,
+      aiProvider: provider || null,
+      aiModel: model || null,
+    })
+    .returning()
+    .get();
+  return inserted;
+}
+
+export async function getConductorConversation(id: string) {
+  return await db
+    .select()
+    .from(conductorConversations)
+    .where(eq(conductorConversations.id, id))
+    .get() ?? null;
+}
+
+export async function listConductorConversations(limit = 20) {
+  const convs = await db
+    .select()
+    .from(conductorConversations)
+    .orderBy(desc(conductorConversations.updatedAt))
+    .limit(limit)
+    .all();
+
+  // Get message counts for each conversation
+  const result = [];
+  for (const conv of convs) {
+    const countRow = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(conductorMessages)
+      .where(eq(conductorMessages.conversationId, conv.id!))
+      .get();
+
+    // Get first user message as preview
+    const firstMsg = await db
+      .select()
+      .from(conductorMessages)
+      .where(
+        and(
+          eq(conductorMessages.conversationId, conv.id!),
+          eq(conductorMessages.role, 'user')
+        )
+      )
+      .orderBy(asc(conductorMessages.createdAt))
+      .limit(1)
+      .get();
+
+    result.push({
+      ...conv,
+      messageCount: countRow?.count ?? 0,
+      preview: firstMsg?.content?.substring(0, 80) || null,
+    });
+  }
+  return result;
+}
+
+export async function getConductorMessages(conversationId: string) {
+  return db
+    .select()
+    .from(conductorMessages)
+    .where(eq(conductorMessages.conversationId, conversationId))
+    .orderBy(asc(conductorMessages.createdAt))
+    .all();
+}
+
+export async function addConductorMessage(
+  conversationId: string,
+  role: string,
+  content: string,
+  metadata?: string | null
+) {
+  const inserted = await db
+    .insert(conductorMessages)
+    .values({
+      conversationId,
+      role,
+      content,
+      metadata: metadata || null,
+    })
+    .returning()
+    .get();
+
+  // Update conversation's updatedAt
+  await db.update(conductorConversations)
+    .set({ updatedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(conductorConversations.id, conversationId))
+    .run();
+
+  return inserted;
+}
+
+export async function updateConductorConversationTitle(
+  id: string,
+  title: string
+) {
+  await db.update(conductorConversations)
+    .set({ title, updatedAt: sql`CURRENT_TIMESTAMP` })
+    .where(eq(conductorConversations.id, id))
+    .run();
+}
+
+export async function deleteConductorConversation(id: string) {
+  await db.delete(conductorConversations)
+    .where(eq(conductorConversations.id, id))
+    .run();
+}
+
+// ============================================================
+// Conductor Memory
+// ============================================================
+
+export async function addConductorMemory(
+  fact: string,
+  category: string = 'general',
+  source?: string
+) {
+  return db
+    .insert(conductorMemory)
+    .values({
+      fact,
+      category,
+      source: source || null,
+    })
+    .returning()
+    .get();
+}
+
+export async function getAllConductorMemories() {
+  return db
+    .select()
+    .from(conductorMemory)
+    .orderBy(desc(conductorMemory.updatedAt))
+    .all();
+}
+
+export async function deleteConductorMemory(id: string) {
+  await db.delete(conductorMemory)
+    .where(eq(conductorMemory.id, id))
+    .run();
+}
+
+export async function clearConductorMemories() {
+  await db.delete(conductorMemory).run();
+}
+
+export async function searchConductorMemories(query: string) {
+  const pattern = `%${query}%`;
+  return db
+    .select()
+    .from(conductorMemory)
+    .where(like(conductorMemory.fact, pattern))
+    .orderBy(desc(conductorMemory.updatedAt))
+    .all();
+}
+
+// ============================================================
+// Tags (user-created sub-tags)
+// ============================================================
+
+export async function getAllTags() {
+  const rows = await db
+    .select({
+      id: tags.id,
+      name: tags.name,
+      createdAt: tags.createdAt,
+      count: sql<number>`count(${signalTags.signalId})`,
+    })
+    .from(tags)
+    .leftJoin(signalTags, eq(tags.id, signalTags.tagId))
+    .groupBy(tags.id)
+    .orderBy(desc(sql`count(${signalTags.signalId})`))
+    .all();
+  return rows;
+}
+
+/**
+ * Returns tags used by signals within a specific category, with counts.
+ */
+export async function getTagsForCategory(category: string) {
+  const rows = await db
+    .select({
+      id: tags.id,
+      name: tags.name,
+      count: sql<number>`count(DISTINCT ${signalTags.signalId})`,
+    })
+    .from(tags)
+    .innerJoin(signalTags, eq(tags.id, signalTags.tagId))
+    .innerJoin(signals, eq(signalTags.signalId, signals.id))
+    .where(eq(signals.category, category))
+    .groupBy(tags.id)
+    .orderBy(desc(sql`count(DISTINCT ${signalTags.signalId})`))
+    .all();
+  return rows;
+}
+
+export async function addTagToSignal(signalId: string, tagName: string) {
+  return db.transaction(async (tx: Transaction) => {
+    // Upsert tag
+    await tx.run(sql`INSERT OR IGNORE INTO tags (name) VALUES (${tagName})`);
+    const tag = await tx.select().from(tags).where(eq(tags.name, tagName)).get();
+    if (!tag) throw new Error('Failed to create tag');
+
+    // Link (ignore if already exists)
+    await tx.run(
+      sql`INSERT OR IGNORE INTO signal_tags (signal_id, tag_id) VALUES (${signalId}, ${tag.id})`
+    );
+
+    return { id: tag.id, name: tag.name, createdAt: tag.createdAt! };
+  });
+}
+
+export async function removeTagFromSignal(signalId: string, tagId: number) {
+  await db.delete(signalTags)
+    .where(and(eq(signalTags.signalId, signalId), eq(signalTags.tagId, tagId)))
+    .run();
+}
+
+export async function deleteTag(tagId: number) {
+  await db.delete(tags).where(eq(tags.id, tagId)).run();
 }

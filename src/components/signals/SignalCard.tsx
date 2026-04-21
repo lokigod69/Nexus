@@ -64,11 +64,6 @@ export function SignalCard({ signal }: { signal: Signal }) {
         {signal.title}
       </h3>
 
-      {/* Summary */}
-      {signal.summary && (
-        <p className="text-xs text-text-secondary mb-2 line-clamp-2">{signal.summary}</p>
-      )}
-
       {/* Tags */}
       {signal.tags && signal.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-2">
@@ -79,10 +74,17 @@ export function SignalCard({ signal }: { signal: Signal }) {
         </div>
       )}
 
+      {/* Summary */}
+      {signal.summary && (
+        <p className={`text-xs text-text-secondary mb-2 line-clamp-2${signal.contentType === 'quote' ? ' italic' : ''}`}>{signal.summary}</p>
+      )}
+
       {/* Footer: age + status + github stars */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          {(signal.enrichments?.favicon as { url: string; source: string } | undefined)?.url && (
+          {signal.source === 'brain_dump' ? (
+            <span className="text-sm">🧠</span>
+          ) : (signal.enrichments?.favicon as { url: string; source: string } | undefined)?.url ? (
             <img
               src={(signal.enrichments!.favicon as { url: string; source: string }).url}
               alt=""
@@ -92,8 +94,10 @@ export function SignalCard({ signal }: { signal: Signal }) {
               style={{ width: 16, height: 16 }}
               onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
             />
-          )}
-          <span className="text-[10px] font-mono text-text-muted">{getAgeLabel(signal.createdAt)}</span>
+          ) : null}
+          <span className="text-[10px] font-mono text-text-muted">
+            {signal.source === 'brain_dump' ? 'Brain dump' : ''}{signal.source === 'brain_dump' ? ' · ' : ''}{getAgeLabel(signal.createdAt)}
+          </span>
           {(() => {
             const gh = signal.enrichments?.github_stats as GitHubStatsData | undefined;
             return gh ? (

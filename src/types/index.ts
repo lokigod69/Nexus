@@ -25,7 +25,12 @@ export type ContentType =
   | 'thread'
   | 'article'
   | 'video'
-  | 'resource';
+  | 'resource'
+  | 'reflection'
+  | 'quote'
+  | 'principle'
+  | 'question'
+  | 'note';
 
 export type ExtractedContentType =
   | 'prompt'
@@ -42,9 +47,25 @@ export type SignalStatus =
   | 'starred'
   | 'archived';
 
-export type AIProviderType = 'anthropic' | 'openai';
+export type AIProviderType = 'openai' | 'openrouter';
 
-export type ViewMode = 'universe' | 'grid' | 'timeline' | 'triage';
+export type ModelTier = 'analysis' | 'chat';
+
+export interface ModelDefinition {
+  id: string;               // unique key, e.g. 'gemma-4-26b'
+  name: string;             // display name
+  provider: AIProviderType;
+  modelId: string;          // OpenRouter or OpenAI model ID
+  tier: ModelTier[];        // which roles this model can fill
+  costInput: number;        // $ per million input tokens (0 = free)
+  costOutput: number;       // $ per million output tokens
+  maxOutput: number;        // max output tokens
+  contextWindow: number;    // max context window
+  free: boolean;
+  description: string;      // one-liner
+}
+
+export type ViewMode = 'universe' | 'grid' | 'timeline' | 'triage' | 'feed' | 'docs';
 
 export type SignalSource =
   | 'X/Twitter'
@@ -52,13 +73,14 @@ export type SignalSource =
   | 'YouTube'
   | 'Reddit'
   | 'Medium'
-  | 'Web';
+  | 'Web'
+  | 'brain_dump';
 
 // --- Core Entities ---
 
 export interface Signal {
   id: string;
-  url: string;
+  url: string | null;
   title: string;
   summary: string | null;
   keyTakeaway: string | null;
@@ -69,11 +91,11 @@ export interface Signal {
   contentType: ContentType;
   source: SignalSource;
   status: SignalStatus;
-  actionable: boolean;
+  actionable: number | boolean;
   note: string | null;
   aiProvider: AIProviderType | null;
   // Embedding fields
-  embedding: Buffer | null;
+  embedding: Buffer | ArrayBuffer | null;
   embeddingModel: string | null;
   embeddingDim: number | null;
   posX: number | null;
@@ -162,11 +184,15 @@ export interface ScrapedContent {
   url: string;
   siteName: string | null;
   ogImage?: string | null;
+  author?: string | null;
+  publishedDate?: string | null;
+  favicon?: string | null;
 }
 
 export interface SignalFilters {
   status?: string;
   category?: string;
+  tag?: string;
   search?: string;
   sort?: 'newest' | 'oldest' | 'starred';
   limit?: number;
@@ -176,12 +202,13 @@ export interface SignalFilters {
 // --- AI Provider Interface ---
 
 export interface AIProvider {
-  summarize(content: string, url: string): Promise<SignalAnalysis>;
+  summarize(content: string, url: string, customPrompt?: string): Promise<SignalAnalysis>;
   chat(
     messages: Message[],
     systemContext: string
   ): AsyncGenerator<string, void, unknown>;
   getModelName(tier: 'fast' | 'deep'): string;
+  setActiveModel(modelId: string): void;
 }
 
 // --- Embedding Provider Interface ---

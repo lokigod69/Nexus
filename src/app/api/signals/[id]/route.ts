@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSignalById, updateSignal, deleteSignal } from '@/lib/db/queries';
+import { exportSignalToObsidianWithRelated, deleteSignalFromObsidian } from '@/lib/export/obsidian-sync';
 
 export async function GET(
   _request: NextRequest,
@@ -43,6 +44,13 @@ export async function PUT(
       return NextResponse.json({ error: 'Signal not found' }, { status: 404 });
     }
 
+    // Re-export to Obsidian (fire-and-forget)
+    if (process.env.OBSIDIAN_VAULT_PATH) {
+      exportSignalToObsidianWithRelated(id).catch(err => {
+        console.warn('[obsidian-sync] Re-export failed:', err instanceof Error ? err.message : err);
+      });
+    }
+
     return NextResponse.json(updated);
   } catch (error: any) {
     return NextResponse.json(
@@ -58,7 +66,19 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+
+    // Fetch signal data before deletion (needed for vault filename)
+    const signal = await getSignalById(id);
+
     await deleteSignal(id);
+
+    // Remove from Obsidian vault (fire-and-forget)
+    if (process.env.OBSIDIAN_VAULT_PATH && signal) {
+      deleteSignalFromObsidian(signal).catch(err => {
+        console.warn('[obsidian-sync] Vault delete failed:', err instanceof Error ? err.message : err);
+      });
+    }
+
     return NextResponse.json({ success: true });
   } catch (error: any) {
     return NextResponse.json(

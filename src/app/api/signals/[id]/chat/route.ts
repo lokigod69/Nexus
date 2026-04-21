@@ -6,8 +6,8 @@ import {
   getMessages,
   addMessage,
 } from '@/lib/db/queries';
-import { getAIProvider } from '@/lib/ai/provider';
-import { getChatSystemPrompt } from '@/lib/ai/prompts';
+import { getChatProvider, getModelById, getChatModelId } from '@/lib/ai/provider';
+import { getChatSystemPrompt, getBrainDumpChatPrompt } from '@/lib/ai/prompts';
 import type { Message } from '@/types';
 
 export async function GET(
@@ -47,13 +47,21 @@ export async function POST(
     }
 
     // Get or create conversation
-    const aiProvider = getAIProvider(provider);
+    // 'provider' from client may be a model ID or legacy provider type
+    let modelOverride: string | undefined;
+    if (provider) {
+      const model = getModelById(provider);
+      if (model) modelOverride = provider;
+    }
+    const aiProvider = await getChatProvider(modelOverride);
+    const activeModelId = modelOverride || await getChatModelId();
+    const activeModel = getModelById(activeModelId);
     let conversation = await getConversation(id);
     if (!conversation) {
       conversation = await createConversation(
         id,
-        provider || 'anthropic',
-        aiProvider.getModelName('deep')
+        activeModel?.provider || 'openrouter',
+        activeModel?.modelId || 'unknown'
       );
     }
 
@@ -64,12 +72,19 @@ export async function POST(
     const history = await getMessages(conversation.id!);
 
     // Build system context
-    const systemContext = getChatSystemPrompt(
-      signal.summary || signal.rawScrapedContent || '',
-      signal.url,
-      signal.category,
-      signal.note
-    );
+    const systemContext = signal.source === 'brain_dump'
+      ? getBrainDumpChatPrompt(
+          signal.rawScrapedContent || signal.summary || '',
+          signal.category,
+          signal.contentType,
+          signal.note
+        )
+      : getChatSystemPrompt(
+          signal.summary || signal.rawScrapedContent || '',
+          signal.url || '',
+          signal.category,
+          signal.note
+        );
 
     // Stream AI response
     const encoder = new TextEncoder();

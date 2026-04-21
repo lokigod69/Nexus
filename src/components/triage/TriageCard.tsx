@@ -73,14 +73,18 @@ export function TriageCard({ signal, animatingOut }: TriageCardProps) {
 
       {/* Footer */}
       <div className="px-6 py-3 bg-elevated/50 border-t border-border-subtle">
-        <a
-          href={signal.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs font-mono text-text-muted hover:text-accent-primary truncate block transition-colors"
-        >
-          {signal.url}
-        </a>
+        {signal.url ? (
+          <a
+            href={signal.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="cursor-pointer text-xs font-mono text-text-muted hover:text-accent-primary truncate block transition-colors"
+          >
+            {signal.url}
+          </a>
+        ) : (
+          <span className="text-xs font-mono text-text-muted">🧠 Brain dump</span>
+        )}
       </div>
     </div>
   );

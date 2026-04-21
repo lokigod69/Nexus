@@ -16,7 +16,7 @@ export const signals = sqliteTable('signals', {
   id: text('id')
     .primaryKey()
     .default(sql`(lower(hex(randomblob(8))))`),
-  url: text('url').notNull().unique(),
+  url: text('url'),
   title: text('title').notNull(),
   summary: text('summary'),
   keyTakeaway: text('key_takeaway'),
@@ -175,4 +175,51 @@ export const enrichmentCache = sqliteTable('enrichment_cache', {
   data: text('data').notNull(),
   fetchedAt: text('fetched_at').default(sql`CURRENT_TIMESTAMP`),
   expiresAt: text('expires_at').notNull(),
+});
+
+// ============================================================
+// Conductor Conversations (global AI navigator — no signal FK)
+// ============================================================
+
+export const conductorConversations = sqliteTable('conductor_conversations', {
+  id: text('id')
+    .primaryKey()
+    .default(sql`(lower(hex(randomblob(8))))`),
+  title: text('title'),
+  aiProvider: text('ai_provider'),
+  aiModel: text('ai_model'),
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
+// ============================================================
+// Conductor Messages
+// ============================================================
+
+export const conductorMessages = sqliteTable('conductor_messages', {
+  id: text('id')
+    .primaryKey()
+    .default(sql`(lower(hex(randomblob(8))))`),
+  conversationId: text('conversation_id')
+    .notNull()
+    .references(() => conductorConversations.id, { onDelete: 'cascade' }),
+  role: text('role').notNull(),
+  content: text('content').notNull(),
+  metadata: text('metadata'), // JSON: signalMap, expandedSignalIds, etc.
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+});
+
+// ============================================================
+// Conductor Memory (persistent facts across conversations)
+// ============================================================
+
+export const conductorMemory = sqliteTable('conductor_memory', {
+  id: text('id')
+    .primaryKey()
+    .default(sql`(lower(hex(randomblob(8))))`),
+  category: text('category').notNull().default('general'),    // user_preference, project, goal, insight, general
+  fact: text('fact').notNull(),
+  source: text('source'),            // conversation ID or 'manual'
+  createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`),
+  updatedAt: text('updated_at').default(sql`CURRENT_TIMESTAMP`),
 });

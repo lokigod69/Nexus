@@ -27,7 +27,7 @@ export function computePositions(
     });
 
     const positions3D = umap.fit(vectors);
-    const scale = 50;
+    const scale = 100;
     const result = new Map<string, { x: number; y: number; z: number }>();
 
     positions3D.forEach((pos: number[], i: number) => {
@@ -52,7 +52,7 @@ function fallbackPositions(
   let angleStep = 0;
 
   const result = new Map<string, { x: number; y: number; z: number }>();
-  const radius = 30;
+  const radius = 50;
 
   signals.forEach((signal) => {
     if (!(signal.category in categoryAngles)) {

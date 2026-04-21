@@ -2,7 +2,7 @@
 
 import { useRef, useState, useMemo, useCallback } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import { Html, Text, Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import type { Signal } from '@/types';
 import { getCategoryColor } from '@/lib/utils/categories';
@@ -19,12 +19,12 @@ interface SignalNodeProps {
 }
 
 function getNodeBaseSize(status: string, hoursSinceCreation: number): number {
-  if (status === 'starred') return 0.8;
-  if (hoursSinceCreation < 24) return 0.6;
-  if (status === 'active' || status === 'playground') return 0.5;
-  if (status === 'triaged') return 0.4;
+  if (status === 'starred') return 1.2;
+  if (hoursSinceCreation < 24) return 0.8;
+  if (status === 'active' || status === 'playground') return 0.6;
+  if (status === 'inbox' || status === 'triaged') return 0.5;
   if (status === 'archived') return 0.3;
-  return 0.5;
+  return 0.6;
 }
 
 function getEmissiveIntensity(status: string, hoursSinceCreation: number): number {
@@ -44,6 +44,7 @@ export function SignalNode({ signal, isSelected, isFiltered, onSelect, onHover, 
   const [hovered, setHovered] = useState(false);
 
   const categoryColor = useMemo(() => new THREE.Color(getCategoryColor(signal.category)), [signal.category]);
+  const categoryColorStr = useMemo(() => getCategoryColor(signal.category), [signal.category]);
 
   const hoursSinceCreation = useMemo(
     () => (Date.now() - new Date(signal.createdAt).getTime()) / 3600000,
@@ -69,6 +70,12 @@ export function SignalNode({ signal, isSelected, isFiltered, onSelect, onHover, 
   const position = useMemo<[number, number, number]>(
     () => [signal.posX ?? 0, signal.posY ?? 0, signal.posZ ?? 0],
     [signal.posX, signal.posY, signal.posZ]
+  );
+
+  // Label text
+  const labelText = useMemo(
+    () => hovered ? signal.title : (signal.title.length > 30 ? signal.title.substring(0, 30) + '…' : signal.title),
+    [signal.title, hovered]
   );
 
   useFrame((state) => {
@@ -116,6 +123,11 @@ export function SignalNode({ signal, isSelected, isFiltered, onSelect, onHover, 
     if (days < 7) return `${days}d ago`;
     return `${Math.floor(days / 7)}w ago`;
   }, [hoursSinceCreation]);
+
+  const sourceLabel = useMemo(() => {
+    if (signal.source === 'brain_dump') return 'Brain Dump';
+    return signal.source;
+  }, [signal.source]);
 
   // Only render point lights on starred/fresh filtered nodes for performance
   const showPointLight = isFiltered && (isStarred || isFresh);
@@ -174,15 +186,46 @@ export function SignalNode({ signal, isSelected, isFiltered, onSelect, onHover, 
         </mesh>
       )}
 
+      {/* Persistent label below node */}
+      {isFiltered && (
+        <Billboard position={[0, -nodeSize * 2.8, 0]} follow>
+          <Text
+            fontSize={0.4}
+            color="white"
+            anchorX="center"
+            anchorY="top"
+            fillOpacity={hovered ? 1.0 : 0.7 * targetOpacity}
+            maxWidth={10}
+          >
+            {labelText}
+          </Text>
+        </Billboard>
+      )}
+
       {/* Tooltip on hover */}
       {hovered && isFiltered && (
         <Html distanceFactor={40} style={{ pointerEvents: 'none' }}>
-          <div className="bg-elevated/95 border border-border-subtle rounded-lg px-3 py-2 whitespace-nowrap backdrop-blur-sm shadow-lg">
-            <div className="text-sm font-sans text-text-primary max-w-[200px] truncate">
+          <div
+            className="rounded-xl px-3 py-2.5 whitespace-nowrap shadow-xl"
+            style={{
+              background: 'rgba(13, 13, 20, 0.85)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderLeft: `3px solid ${categoryColorStr}`,
+            }}
+          >
+            <div className="text-sm font-sans text-text-primary max-w-[220px] truncate">
               {signal.title}
             </div>
             <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-text-muted">
-              <span style={{ color: getCategoryColor(signal.category) }}>{signal.category}</span>
+              <span
+                className="w-1.5 h-1.5 rounded-full inline-block flex-shrink-0"
+                style={{ backgroundColor: categoryColorStr }}
+              />
+              <span style={{ color: categoryColorStr }}>{signal.category}</span>
+              <span>·</span>
+              <span>{sourceLabel}</span>
+              <span>·</span>
               <span>{age}</span>
             </div>
           </div>

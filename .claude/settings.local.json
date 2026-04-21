@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(netstat -ano)",
+      "Bash(tasklist /FI \"PID eq 53524\")",
+      "Bash(wmic process:*)",
+      "Bash(powershell -Command \"Get-Process -Id 53524 | Select-Object ProcessName, Id, Path\")",
+      "Bash(powershell -Command \"Stop-Process -Id 53524 -Force\")"
+    ]
+  }
+}
