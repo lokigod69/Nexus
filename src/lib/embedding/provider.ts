@@ -77,7 +77,16 @@ let instance: EmbeddingProvider | null = null;
 
 export function getEmbeddingProvider(): EmbeddingProvider {
   if (!instance) {
-    instance = new GeminiEmbeddingProvider();
+    // Priority: Gemini (cloud, best quality) → Ollama (local, free)
+    if (process.env.GEMINI_API_KEY) {
+      instance = new GeminiEmbeddingProvider();
+    } else if (process.env.OLLAMA_ENABLED === 'true') {
+      const { OllamaEmbeddingProvider } = require('./ollama');
+      instance = new OllamaEmbeddingProvider();
+    } else {
+      // Fallback to Gemini (will throw if no key)
+      instance = new GeminiEmbeddingProvider();
+    }
   }
-  return instance;
+  return instance!;
 }

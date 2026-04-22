@@ -1,6 +1,7 @@
 import { AIProvider, AIProviderType, ModelDefinition } from '@/types';
 import { OpenAIProvider } from './openai';
 import { OpenRouterProvider } from './openrouter';
+import { OllamaProvider } from './ollama';
 import { getSetting } from '@/lib/db/queries';
 
 // ─── Model Registry ────────────────────────────────────────────
@@ -89,6 +90,47 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     free: false,
     description: 'Strong reasoning + coding, good for chat',
   },
+
+  // ── Ollama (local, free) ────────────────────────────────────
+  {
+    id: 'ollama-qwen3.5',
+    name: 'Qwen 3.5 (Ollama)',
+    provider: 'ollama',
+    modelId: 'qwen3:32b',
+    tier: ['analysis', 'chat'],
+    costInput: 0,
+    costOutput: 0,
+    maxOutput: 32768,
+    contextWindow: 128000,
+    free: true,
+    description: 'Local Qwen 3.5 — free, private, no API costs',
+  },
+  {
+    id: 'ollama-qwen3',
+    name: 'Qwen 3 30B (Ollama)',
+    provider: 'ollama',
+    modelId: 'qwen3:30b-a3b',
+    tier: ['analysis', 'chat'],
+    costInput: 0,
+    costOutput: 0,
+    maxOutput: 32768,
+    contextWindow: 128000,
+    free: true,
+    description: 'Local Qwen 3 MoE — fast, good JSON output',
+  },
+  {
+    id: 'ollama-gemma3',
+    name: 'Gemma 3 27B (Ollama)',
+    provider: 'ollama',
+    modelId: 'gemma3:27b',
+    tier: ['analysis', 'chat'],
+    costInput: 0,
+    costOutput: 0,
+    maxOutput: 8192,
+    contextWindow: 128000,
+    free: true,
+    description: 'Local Gemma 3 — solid all-rounder',
+  },
 ];
 
 // ─── Helpers ───────────────────────────────────────────────────
@@ -111,7 +153,8 @@ export async function getAnalysisModelId(): Promise<string> {
     const model = getModelById(setting);
     if (model) return model.id;
   }
-  // Default: Gemma 4 Free if OpenRouter key exists, else GPT-4o Mini
+  // Default priority: Ollama (free local) → OpenRouter free tier → GPT-4o Mini
+  if (process.env.OLLAMA_ENABLED === 'true') return 'ollama-qwen3.5';
   if (process.env.OPENROUTER_KEY) return 'gemma-4-26b-free';
   return 'gpt-4o-mini';
 }
@@ -126,7 +169,8 @@ export async function getChatModelId(): Promise<string> {
     const model = getModelById(setting);
     if (model) return model.id;
   }
-  // Default: Nemotron Free if OpenRouter key exists, else GPT-4o Mini
+  // Default priority: Ollama (free local) → OpenRouter free tier → GPT-4o Mini
+  if (process.env.OLLAMA_ENABLED === 'true') return 'ollama-qwen3.5';
   if (process.env.OPENROUTER_KEY) return 'nemotron-free';
   return 'gpt-4o-mini';
 }
@@ -135,8 +179,13 @@ export async function getChatModelId(): Promise<string> {
 
 let openaiInstance: OpenAIProvider | null = null;
 let openrouterInstance: OpenRouterProvider | null = null;
+let ollamaInstance: OllamaProvider | null = null;
 
 function getProviderInstance(provider: AIProviderType): AIProvider {
+  if (provider === 'ollama') {
+    if (!ollamaInstance) ollamaInstance = new OllamaProvider();
+    return ollamaInstance;
+  }
   if (provider === 'openrouter') {
     if (!openrouterInstance) openrouterInstance = new OpenRouterProvider();
     return openrouterInstance;
@@ -184,6 +233,7 @@ export function getAvailableProviders(): Record<AIProviderType, boolean> {
   return {
     openrouter: !!process.env.OPENROUTER_KEY,
     openai: !!process.env.OPENAI_API_KEY,
+    ollama: process.env.OLLAMA_ENABLED === 'true',
   };
 }
 

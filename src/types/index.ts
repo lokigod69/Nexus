@@ -47,7 +47,7 @@ export type SignalStatus =
   | 'starred'
   | 'archived';
 
-export type AIProviderType = 'openai' | 'openrouter';
+export type AIProviderType = 'openai' | 'openrouter' | 'ollama';
 
 export type ModelTier = 'analysis' | 'chat';
 
