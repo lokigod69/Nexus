@@ -20,8 +20,10 @@ Newest first. Append-only at the top; roll old halves into archive/ past ~300 li
   umap-js, @google/genai, @anthropic-ai/sdk, react-markdown, copy-to-clipboard, typography.
 - Docs rewritten: CLAUDE.md, README.md. Brain installed (this memory/ layer) and registered
   in SecondBrainOS/PROJECTS.md.
-- Open: deploy to Vercel (nexus-oz7q) and verify prod; sounds not yet judged by human ears;
-  see STATE.md → Next actions.
+- Open: deploy blocked — the Vercel project nexus-oz7q is PAUSED (503 DEPLOYMENT_PAUSED;
+  push-triggered builds stall at UNKNOWN). Human must resume it in the dashboard; v2 is
+  pushed and CLI-linked, so the build runs on resume. Sounds not yet judged by human ears.
+  See STATE.md → Next actions.
 
 ## Pre-2026-07-11 (v1 era, condensed)
 - c165407 Add Ollama provider · 7eb1258 Turso + Vercel migration · 0744ef5 v0.1 ·

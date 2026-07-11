@@ -38,7 +38,12 @@ Deliberately small. No embeddings, no 3D, no chat (all of that was v1, deleted).
 - Nexus itself is now in PROJECTS.md — captures about Nexus can route to its own brain.
 
 ## Next actions
-1. Deploy: push to GitHub → Vercel (project **nexus-oz7q**; the other Vercel Nexus project
-   is unused and can be deleted in the dashboard). Verify prod with NEXUS_PASSWORD gate.
-2. Set NEXUS_URL + NEXUS_TOKEN (= NEXUS_PASSWORD) locally so `npm run pull` targets prod.
+1. **HUMAN: resume the paused Vercel project.** nexus-oz7q is PAUSED (prod 503s with
+   `x-vercel-error: DEPLOYMENT_PAUSED`; pushed deployments sit in UNKNOWN and never build).
+   Vercel dashboard → nexus-oz7q → resume, then the queued build should run (or redeploy).
+   v2 is pushed (commits 2f09f82 + aa1b65c) and repo is CLI-linked (.vercel/, gitignored).
+   Also: delete the second unused Vercel project `nexus` (builds fail, no env vars) and
+   push SecondBrainOS (registration commit 02a9615 is local-only; push was permission-blocked).
+2. Verify prod after resume: login gate (NEXUS_PASSWORD), capture from phone, then set
+   NEXUS_URL + NEXUS_TOKEN (= NEXUS_PASSWORD) locally so `npm run pull` targets prod.
 3. Use it for a week from phone + desktop; then decide on pull automation (open question 1).
