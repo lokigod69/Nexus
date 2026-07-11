@@ -1,40 +1,31 @@
 {
   "name": "nexus",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "pull": "node scripts/nexus-pull.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.78.0",
-    "@google/genai": "^1.44.0",
     "@mendable/firecrawl-js": "^4.16.0",
-    "@react-three/drei": "^10.7.7",
-    "@react-three/fiber": "^9.5.0",
-    "@react-three/postprocessing": "^3.0.4",
-    "@tailwindcss/typography": "^0.5.19",
-    "@types/three": "^0.183.1",
     "@libsql/client": "^0.14.0",
-    "copy-to-clipboard": "^3.3.3",
+    "cuelume": "^0.1.0",
     "date-fns": "^4.1.0",
     "drizzle-orm": "^0.45.1",
     "lucide-react": "^0.577.0",
+    "motion": "^12.0.0",
     "next": "16.1.6",
     "openai": "^6.27.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-hot-toast": "^2.6.0",
-    "react-markdown": "^10.1.0",
-    "three": "^0.183.2",
-    "umap-js": "^1.4.0",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

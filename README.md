@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Nexus — The Front Door to raw/
 
-## Getting Started
-
-First, run the development server:
+The capture layer of the [Second Brain system](file:///D:/CODING/SecondBrainOS/PROTOCOL.md).
+Dump a link or a thought from any device. Nexus scrapes it, has an AI write a title, summary,
+takeaway, and tags, and suggests which project brain it belongs to. You confirm with one tap.
+Then, on your machine:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run pull
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+…and every routed capture lands as a dated markdown file in that project's `memory/raw/`,
+where the Second Brain protocol takes over (the next `brain-save` harvests it).
+Nexus's job ends at `raw/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## The loop
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+any device                    cloud (Vercel + Turso)              your machine
+──────────                    ──────────────────────              ────────────
+paste link/thought  ──────▶   enrich (scrape + 1 AI call)
+                              inbox: AI suggests a project
+tap to confirm      ──────▶   status: routed
+                                                        ◀──────  npm run pull
+                              status: delivered  ──────▶  <project>/memory/raw/nexus-*.md
+```
 
-## Learn More
+## Screens
 
-To learn more about Next.js, take a look at the following resources:
+- `/` — **Capture.** One input. Paste and go.
+- `/inbox` — **Route.** Confirm the AI's suggestion, pick another project, or archive.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Development
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run dev                    # localhost:3001
+npm run build                  # type-check + build (the gate)
+node scripts/acceptance.mjs    # behavioral contract — see file header for setup
+```
 
-## Deploy on Vercel
+Docs: [docs/SPEC.md](docs/SPEC.md) (architecture + design contract),
+[src/types/index.ts](src/types/index.ts) (canonical shapes),
+[docs/v1/](docs/v1/) (the original 2026 "Knowledge Reactor" design, historical).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## History
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+v1 tried to be a knowledge universe — embeddings, UMAP, a 3D graph, per-item chat.
+It went stale because there was no memory protocol underneath it. v2 is deliberately small:
+a beautiful front door to `memory/raw/`. The protocol does the rest.

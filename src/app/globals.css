@@ -1,236 +1,194 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Nunito:wght@400;500;600&family=Quicksand:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Merriweather:ital,wght@0,400;0,700;1,400&family=Outfit:wght@400;500;600&display=swap');
 @import "tailwindcss";
-@plugin "@tailwindcss/typography";
 
 @theme inline {
-  /* Backgrounds */
+  /* Near-black, warm-tinted neutrals (design contract) */
   --color-void: #08080d;
   --color-surface: #0d0d14;
   --color-elevated: #12121e;
 
-  /* Borders */
-  --color-border-subtle: #1a1a2e;
-  --color-border-active: #2a2a4e;
+  /* Hairlines */
+  --color-line: #1e1c26;
+  --color-line-strong: #2d2a38;
 
-  /* Text */
-  --color-text-primary: #e0e0e0;
-  --color-text-secondary: #888888;
-  --color-text-muted: #555555;
-  --color-text-ghost: #333333;
+  /* Ink — warm off-whites, body contrast >= 4.5:1 on surface */
+  --color-ink: #ece9e2;
+  --color-ink-secondary: #a8a196;
+  --color-ink-muted: #7d766b;
 
-  /* Category Accents */
-  --color-accent-primary: #00ffa3;
-  --color-accent-prompts: #ff6bff;
-  --color-accent-coding: #00d4ff;
-  --color-accent-ai-art: #a855f7;
-  --color-accent-video: #ff4444;
-  --color-accent-tools: #ffa500;
-  --color-accent-philosophy: #7b8aff;
-  --color-accent-music: #00ffcc;
-  --color-accent-lifestyle: #ffcc00;
-  --color-accent-learning: #4ade80;
-  --color-accent-other: #666666;
+  /* One locked accent: amber */
+  --color-accent: oklch(0.78 0.14 75);
+  --color-accent-strong: oklch(0.85 0.15 78);
+  --color-accent-ink: oklch(0.2 0.05 75);
 
-  /* Status Colors */
-  --color-status-fresh: #00ffa3;
-  --color-status-active: #7b8aff;
-  --color-status-starred: #ffd700;
-  --color-status-archived: #444444;
-  --color-status-playground: #ff6bff;
+  /* Semantic (errors only; success is never toasted) */
+  --color-danger: #e5645a;
 
-  /* Semantic */
-  --color-danger: #ff4444;
-  --color-success: #00ffa3;
-  --color-warning: #ffd700;
-
-  /* Fonts */
-  --font-sans: 'Outfit', 'Space Grotesk', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  /* Fonts wired from next/font in layout.tsx */
+  --font-sans: var(--font-outfit), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", monospace;
 }
 
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   background-color: var(--color-void);
-  color: var(--color-text-primary);
+  color: var(--color-ink);
 }
 
-/* Ensure all interactive elements have pointer cursor */
+body {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.55; /* body leading 1.5–1.6 */
+  letter-spacing: 0; /* body tracking near 0; headings tighten per-size */
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ------------------------------------------------------------------
+   Response: feedback lives on the press (pointer-down), and it's instant.
+   :active fires on pointer-down — scale 0.97 with a fast ease-out.
+------------------------------------------------------------------- */
+button,
+[role="button"] {
+  transition:
+    transform 100ms ease-out,
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out,
+    opacity 140ms ease-out;
+}
+
+button:active:not(:disabled),
+[role="button"]:active {
+  transform: scale(0.97);
+}
+
 button:not(:disabled),
-[role="button"]:not(:disabled) {
+[role="button"] {
   cursor: pointer;
 }
 
-/* Custom scrollbar for dark theme */
+button:disabled {
+  cursor: default;
+}
+
+/* Keyboard focus — one accent, visible, no default-blue */
+:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--color-accent) 70%, transparent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+textarea:focus-visible,
+input:focus-visible {
+  outline: none; /* fields carry their own focus border */
+}
+
+/* ------------------------------------------------------------------
+   Translucent chrome — ONLY where content actually scrolls beneath
+   (the sticky header). Frosts solid under reduced-transparency.
+------------------------------------------------------------------- */
+.chrome {
+  background: color-mix(in srgb, var(--color-void) 78%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .chrome {
+    background: var(--color-void);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Soft scroll-edge instead of a hard 1px divider */
+.chrome-edge {
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--color-line-strong) 80%, transparent) 20%,
+    color-mix(in srgb, var(--color-line-strong) 80%, transparent) 80%,
+    transparent
+  );
+}
+
+/* ------------------------------------------------------------------
+   Pending-enrichment shimmer
+------------------------------------------------------------------- */
+.shimmer {
+  background: linear-gradient(
+    100deg,
+    var(--color-elevated) 38%,
+    #1a1926 50%,
+    var(--color-elevated) 62%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.5s linear infinite;
+  border-radius: 4px;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Reduced motion: cross-fades only. Springs are handled in JS via
+   useReducedMotion; this covers everything CSS-driven.
+------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer {
+    animation: shimmer-pulse 2s ease-in-out infinite;
+    background: var(--color-elevated);
+  }
+
+  @keyframes shimmer-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Scrollbar, tuned to the palette */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-void);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border-subtle);
+  background: var(--color-line);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-border-active);
+  background: var(--color-line-strong);
 }
 
-/* Selection */
 ::selection {
-  background-color: rgba(0, 255, 163, 0.2);
-  color: var(--color-text-primary);
-}
-
-/* Triage card animations */
-.animate-in {
-  animation: slideIn 0.3s ease-out;
-}
-
-.animate-out-left {
-  animation: slideOutLeft 0.3s ease-in forwards;
-}
-
-.animate-out-right {
-  animation: slideOutRight 0.3s ease-in forwards;
-}
-
-.animate-out-up {
-  animation: slideOutUp 0.3s ease-in forwards;
-}
-
-@keyframes slideIn {
-  from { transform: translateY(40px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-@keyframes slideOutLeft {
-  to { transform: translateX(-120%) rotate(-8deg); opacity: 0; }
-}
-
-@keyframes slideOutRight {
-  to { transform: translateX(120%) rotate(8deg); opacity: 0; }
-}
-
-@keyframes slideOutUp {
-  to { transform: translateY(-120%); opacity: 0; }
-}
-
-/* Weather particle animations */
-@keyframes rainDrop {
-  0% { transform: translateY(-10vh); }
-  100% { transform: translateY(110vh); }
-}
-
-@keyframes snowflake {
-  0% { transform: translateY(-5vh) translateX(0); }
-  25% { transform: translateY(25vh) translateX(15px); }
-  50% { transform: translateY(50vh) translateX(-10px); }
-  75% { transform: translateY(75vh) translateX(20px); }
-  100% { transform: translateY(110vh) translateX(5px); }
-}
-
-@keyframes thunderFlash {
-  0% { opacity: 0; }
-  20% { opacity: 1; }
-  100% { opacity: 0; }
-}
-
-.rain-particle {
-  animation: rainDrop linear infinite;
-}
-
-.snow-particle {
-  animation: snowflake ease-in-out infinite;
-}
-
-@keyframes reanalyze-pulse {
-  0%, 100% { border-left-color: inherit; opacity: 1; }
-  50% { border-left-color: rgba(255,255,255,0.25); opacity: 0.85; }
-}
-
-/* === Visual Overhaul: Dark Cosmic Aesthetic === */
-
-/* Border glow rotation */
-@property --glow-angle {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes glowRotate {
-  to { --glow-angle: 360deg; }
-}
-
-/* Date separator gradient line */
-.date-line-gradient {
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.08) 30%,
-    rgba(255, 255, 255, 0.08) 70%,
-    transparent
-  );
-}
-
-/* NEXUS logo text glow */
-.nexus-logo-glow {
-  text-shadow: 0 0 20px rgba(0, 255, 163, 0.15);
-}
-
-/* Single-column feed container */
-.feed-container {
-  max-width: 700px;
-  margin: 0 auto;
-  padding: 24px 20px;
-  display: flex;
-  flex-direction: column;
-}
-@media (max-width: 1000px) {
-  .feed-container {
-    max-width: 600px;
-  }
-}
-@media (max-width: 600px) {
-  .feed-container {
-    max-width: 100%;
-    padding: 16px 12px;
-  }
-}
-
-/* Feed card hover transition */
-.feed-card {
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.feed-card:hover {
-  transform: translateY(-2px) scale(1.015);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-}
-.feed-card:hover > div:last-child {
-  background: linear-gradient(90deg, var(--feed-card-wash, transparent) 0%, transparent 30%), rgba(255,255,255,0.05) !important;
-  border-color: rgba(255,255,255,0.12) !important;
-}
-
-/* Signal modal entrance animations */
-@keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes modalSlideUp {
-  from { opacity: 0; transform: translateY(20px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-.signal-modal-overlay {
-  animation: modalFadeIn 0.2s ease-out;
-}
-
-.signal-modal-body {
-  animation: modalSlideUp 0.25s ease-out;
+  background-color: color-mix(in oklab, var(--color-accent) 28%, transparent);
+  color: var(--color-ink);
 }

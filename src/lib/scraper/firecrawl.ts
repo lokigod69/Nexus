@@ -1,4 +1,4 @@
-import Firecrawl from '@mendable/firecrawl-js';
+﻿import Firecrawl from '@mendable/firecrawl-js';
 import { ScrapedContent } from '@/types';
 
 export async function scrapeWithFirecrawl(url: string): Promise<ScrapedContent> {
@@ -15,12 +15,12 @@ export async function scrapeWithFirecrawl(url: string): Promise<ScrapedContent> 
   return {
     title: result.metadata?.title || result.metadata?.ogTitle || 'Untitled',
     content: result.markdown || '',
-    description: result.metadata?.description || result.metadata?.ogDescription || null,
+    description: result.metadata?.description || result.metadata?.ogDescription || undefined,
     url: result.metadata?.sourceURL || url,
-    siteName: result.metadata?.ogSiteName || null,
-    ogImage: result.metadata?.ogImage || null,
-    author: (result.metadata as Record<string, unknown>)?.author as string || null,
-    publishedDate: result.metadata?.publishedTime || null,
-    favicon: result.metadata?.favicon || null,
+    siteName: result.metadata?.ogSiteName || undefined,
+    ogImage: result.metadata?.ogImage || undefined,
+    author: (result.metadata as Record<string, unknown>)?.author as string || undefined,
+    publishedDate: result.metadata?.publishedTime || undefined,
+    favicon: result.metadata?.favicon || undefined,
   };
 }

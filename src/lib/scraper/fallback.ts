@@ -37,10 +37,10 @@ export async function scrapeFallback(url: string): Promise<ScrapedContent> {
       description:
         getMetaContent('og:description') ||
         getMetaContent('description') ||
-        null,
+        undefined,
       url,
-      siteName: getMetaContent('og:site_name') || null,
-      ogImage: getMetaContent('og:image') || null,
+      siteName: getMetaContent('og:site_name') || undefined,
+      ogImage: getMetaContent('og:image') || undefined,
     };
   } finally {
     clearTimeout(timeout);

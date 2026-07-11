@@ -1,7 +1,7 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { JetBrains_Mono, Outfit } from 'next/font/google';
 import { Toaster } from 'react-hot-toast';
-import { EnrichmentProvider } from '@/components/enrichment/EnrichmentProvider';
+import { SoundProvider } from '@/components/sound/SoundProvider';
 import './globals.css';
 
 const outfit = Outfit({
@@ -17,11 +17,24 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Nexus — Knowledge Reactor',
-  description: 'Capture signals from the noise, understand them with AI, navigate your collected intelligence.',
+  title: 'Nexus',
+  description:
+    'The front door to your Second Brain — capture a link or a thought, route it to the right project.',
+  manifest: '/manifest.webmanifest',
   icons: {
-    icon: { url: '/favicon.svg', type: 'image/svg+xml' },
+    icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }],
+    apple: [{ url: '/icon-192.png' }],
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Nexus',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#08080d',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({
@@ -31,23 +44,27 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${outfit.variable} ${jetbrainsMono.variable} font-sans antialiased bg-void text-text-primary`}>
-        <EnrichmentProvider>
-          {children}
-        </EnrichmentProvider>
+      <body
+        className={`${outfit.variable} ${jetbrainsMono.variable} bg-void font-sans text-ink antialiased`}
+      >
+        <SoundProvider />
+        {children}
+        {/* Errors only — success is always shown in-card, never toasted. */}
         <Toaster
-          position="top-right"
+          position="top-center"
           toastOptions={{
-            duration: 3000,
+            duration: 3500,
             style: {
               background: '#12121e',
-              color: '#e0e0e0',
-              border: '1px solid #1a1a2e',
+              color: '#ece9e2',
+              border: '1px solid #2d2a38',
+              borderRadius: '10px',
               fontSize: '14px',
-              fontFamily: 'var(--font-mono)',
+              fontFamily: 'var(--font-outfit), system-ui, sans-serif',
             },
-            success: { iconTheme: { primary: '#00ffa3', secondary: '#12121e' } },
-            error: { iconTheme: { primary: '#ff4444', secondary: '#12121e' } },
+            error: {
+              iconTheme: { primary: '#e5645a', secondary: '#12121e' },
+            },
           }}
         />
       </body>
