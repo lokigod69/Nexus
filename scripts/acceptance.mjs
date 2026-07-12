@@ -128,10 +128,18 @@ check('q matches content substring', hit?.captures?.length === 1 && hit.captures
 const miss = await api('GET', '/api/captures?status=all&q=nonexistentxyzzy');
 check('q with no match returns empty', miss?.captures?.length === 0);
 
-// --- 7. enrichment (graceful degradation is the contract) ---------------------
+// --- 7. models + enrichment (graceful degradation is the contract) ------------
+console.log('# models');
+const modelsRes = await api('GET', '/api/models');
+check('models list returned', Array.isArray(modelsRes?.models));
+check('gpt-4o-mini selectable (OPENAI_API_KEY set)', modelsRes?.models?.some(m => m.id === 'gpt-4o-mini'));
+
 console.log('# enrich');
-const e = await api('POST', `/api/captures/${c2.id}/enrich`, null, 200);
+const e = await api('POST', `/api/captures/${c2.id}/enrich`, {}, 200);
 check('enrich returns capture', !!e?.capture);
+// Forced model: single attempt, no fallback chain.
+const eForced = await api('POST', `/api/captures/${c2.id}/enrich`, { modelId: 'gpt-4o-mini' }, 200);
+check('forced-model enrich resolves', eForced?.capture?.enrichStatus === 'done' || eForced?.capture?.enrichStatus === 'failed');
 check('enrichStatus resolved', e?.capture?.enrichStatus === 'done' || e?.capture?.enrichStatus === 'failed');
 if (e?.capture?.enrichStatus === 'done') {
   check('title set', typeof e.capture.title === 'string' && e.capture.title.length > 0);

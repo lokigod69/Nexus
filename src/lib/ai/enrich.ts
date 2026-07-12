@@ -1,6 +1,6 @@
 import type { EnrichInput, EnrichmentResult } from '@/types';
 import { GENERAL_PROJECT_SLUG } from '@/types';
-import { getAIProvider, getFallbackModelIds } from './provider';
+import { getAIProvider, getFallbackModelIds, getModelById } from './provider';
 import { buildEnrichSystemPrompt, buildEnrichUserPrompt } from './prompts';
 
 /** lowercase-kebab normalizer for tags. */
@@ -82,22 +82,34 @@ export function toEnrichmentResult(
 }
 
 /**
- * One-shot enrichment: builds the prompts, walks the fallback model chain
- * (free-tier models 429 routinely — a busted response falls through to the
- * next model the same way a provider error does), parses defensively,
- * validates against the registry.
- * Throws only when EVERY model in the chain failed — the caller then
- * degrades to enrichStatus 'failed'.
+ * One-shot enrichment: builds the prompts, then either
+ *  - `preferredModelId` given and known: tries ONLY that model, single
+ *    attempt, no fallback — so a model comparison reflects that model,
+ *    not a silent swap to whatever else happened to work; or
+ *  - otherwise: walks the fallback model chain (free-tier models 429
+ *    routinely — a busted response falls through to the next model the
+ *    same way a provider error does).
+ * Parses defensively, validates against the registry. Throws when the
+ * (only, or every) attempted model failed — the caller then degrades to
+ * enrichStatus 'failed'.
  */
-export async function enrichCapture(input: EnrichInput): Promise<EnrichmentResult> {
+export async function enrichCapture(
+  input: EnrichInput,
+  preferredModelId?: string
+): Promise<EnrichmentResult> {
   const system = buildEnrichSystemPrompt(input.projects);
   const user = buildEnrichUserPrompt(input);
 
   const fallbackTitle =
     input.scraped?.title || input.content.substring(0, 80) || input.url || 'Untitled capture';
 
+  const chain =
+    preferredModelId && getModelById(preferredModelId)
+      ? [preferredModelId]
+      : getFallbackModelIds();
+
   let lastError: unknown;
-  for (const modelId of getFallbackModelIds()) {
+  for (const modelId of chain) {
     try {
       const provider = getAIProvider(modelId);
       const raw = await provider.complete(system, user);

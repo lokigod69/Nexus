@@ -4,6 +4,7 @@ import type { BrainProject, Capture } from '@/types';
 import { GENERAL_PROJECT_SLUG } from '@/types';
 import { api } from './api';
 import { playCue } from '@/components/sound/sound';
+import { AUTO_MODEL, getPreferredModel } from './modelPreference';
 
 const URL_RE = /^https?:\/\/\S+$/i;
 
@@ -115,7 +116,11 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       ),
     }));
     try {
-      const { capture } = await api.enrichCapture(id);
+      const preferred = getPreferredModel();
+      const { capture } = await api.enrichCapture(
+        id,
+        preferred === AUTO_MODEL ? undefined : preferred
+      );
       set((s) => ({ captures: replaceCapture(s.captures, id, capture) }));
       if (capture.enrichStatus === 'done') playCue('success');
       // 'failed' is shown in-card (retry affordance) — never toasted.

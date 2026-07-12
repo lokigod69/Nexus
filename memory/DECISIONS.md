@@ -1,6 +1,20 @@
 # Decisions
 Newest first. Superseded decisions are marked, never deleted.
 
+## 2026-07-12 — Selectable enrichment model, client-side preference only
+**Status:** active
+**Decision:** added DeepSeek V4 Flash + DeepSeek V4 Pro (OpenRouter) to MODEL_REGISTRY;
+`GET /api/models` exposes credential-gated options; `POST .../enrich` takes optional
+`{modelId}` and, when given, tries ONLY that model (no fallback masking). The choice lives
+in browser localStorage (`nexus-model`), not a DB/settings row.
+**Why:** user wants to A/B which model writes the best summaries before committing; a forced
+single-attempt call is the only way a comparison is honest — if it silently fell back to
+gpt-4o-mini on failure, the user couldn't tell which model actually answered. Client-side
+storage because this is a personal testing knob, not a durable product setting worth a
+migration; "Auto" (the existing fallback chain) stays the default for everyone else.
+**Rejected:** a server-side settings table (v1 pattern, explicitly dropped in the v2 rebuild
+decision below — reintroducing it for a temporary comparison knob isn't worth the weight).
+
 ## 2026-07-12 — Ask Nexus: SQL retrieval + one completion, scoped to captures only
 **Status:** active
 **Decision:** POST /api/ask retrieves candidates with plain SQL (recent 15 ∪ keyword LIKE,

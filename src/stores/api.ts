@@ -6,8 +6,10 @@ import type {
   CaptureStatus,
   CreateCaptureRequest,
   CreateCaptureResponse,
+  EnrichRequest,
   EnrichResponse,
   ListCapturesResponse,
+  ListModelsResponse,
   ListProjectsResponse,
   UpdateCaptureRequest,
   UpdateCaptureResponse,
@@ -52,11 +54,19 @@ export const api = {
     });
   },
 
-  /** POST /api/captures/[id]/enrich — idempotent; safe to re-fire on retry. */
-  enrichCapture(id: string): Promise<EnrichResponse> {
+  /** POST /api/captures/[id]/enrich — idempotent; safe to re-fire on retry.
+   *  `modelId` forces one specific model for this call only (A/B testing). */
+  enrichCapture(id: string, modelId?: string): Promise<EnrichResponse> {
+    const body: EnrichRequest = modelId ? { modelId } : {};
     return request<EnrichResponse>(`/api/captures/${id}/enrich`, {
       method: 'POST',
+      body: JSON.stringify(body),
     });
+  },
+
+  /** GET /api/models — selectable enrichment models for a picker UI. */
+  listModels(): Promise<ListModelsResponse> {
+    return request<ListModelsResponse>('/api/models');
   },
 
   /** GET /api/captures?status=<status|all>&q=<text>&limit=<n> */

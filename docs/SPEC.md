@@ -158,3 +158,32 @@ streaming (single-shot). Scope honesty: Ask knows captures only, not project mem
 Once enrichment lands on `/`, the suggestion chip becomes actionable: tap to confirm the
 suggested project immediately; a compact picker (multi-select, same as inbox) is one step
 away. No detour through /inbox for the common case.
+
+---
+
+# v2.2 addendum — selectable enrichment model (2026-07-12)
+
+## Model registry
+`src/lib/ai/provider.ts` MODEL_REGISTRY gained `deepseek-v4-flash` and `deepseek-v4-pro`
+(both via OpenRouter — `deepseek/deepseek-v4-flash` / `deepseek/deepseek-v4-pro`), alongside
+the existing ollama/gemma-free/gpt-4o-mini entries. `getSelectableModels()` filters to
+providers with configured credentials (env-gated) and returns the public-safe `ModelOption`
+shape (id/name/free — no pricing/provider exposed to the client).
+
+## GET /api/models
+Returns `{ models: ModelOption[] }` for the picker. No auth beyond the existing middleware gate.
+
+## Forcing a model per enrich call
+`POST /api/captures/[id]/enrich` body is now optional `{ modelId? }`. When `modelId` names a
+known registry entry, `enrichCapture` tries ONLY that model — single attempt, no fallback —
+so a deliberate A/B comparison reflects that model's real behavior rather than a silent swap
+to whichever model happened to succeed. Omitted or unknown `modelId` → unchanged default
+fallback chain (Ollama → OpenRouter free → gpt-4o-mini).
+
+## Client: model preference
+`src/stores/modelPreference.ts` persists the chosen model id in localStorage (`nexus-model`,
+default `'auto'`) — a client-only preference, not a server setting; it travels with the browser,
+not the account. `ModelPicker` in the header (next to the mute toggle) lists "Auto" + the
+live `/api/models` result; `captureStore.enrich` reads the preference and passes it through
+on every enrich/retry call. This is a testing knob for "which model writes better," not a
+permanent per-project setting.

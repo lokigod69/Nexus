@@ -29,7 +29,15 @@ to captures only. Still no embeddings, no 3D, no open-ended chat.
 - cuelume sounds (3 moments + mute), PWA share_target, full reduced-motion support.
 
 ## In progress
-- Nothing mid-flight. v2.1 shipped 2026-07-12.
+- Nothing mid-flight. v2.2 shipped 2026-07-12 (same day as v2.1).
+
+## v2.2 addition (same day)
+- Selectable enrichment model: DeepSeek V4 Flash + DeepSeek V4 Pro added to the registry
+  (OpenRouter) alongside Gemma-free/gpt-4o-mini/Ollama. New `GET /api/models`. A header
+  picker (next to mute) lets the user force one specific model per enrich call — single
+  attempt, no silent fallback — for genuine A/B comparison; "Auto" (default) is unchanged.
+  Verified live: forced DeepSeek V4 Flash on a real capture, resolved `done` with a clean
+  title. Preference is a client-side localStorage value (`nexus-model`), not per-project.
 
 ## Known problems
 - OpenRouter free-tier model (`gemma-4-26b:free`) 429s near-permanently; the chain falls back

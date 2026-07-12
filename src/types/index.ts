@@ -74,9 +74,26 @@ export interface CreateCaptureResponse {
 }
 
 /** POST /api/captures/[id]/enrich — scrape (if url) + one AI call. Idempotent:
- *  re-running on a 'done' capture re-enriches; concurrent calls are safe. */
+ *  re-running on a 'done' capture re-enriches; concurrent calls are safe.
+ *  Body is optional. `modelId` forces one specific registry model for THIS
+ *  call only (single attempt, no fallback chain — so an A/B comparison
+ *  reflects that model, not a silent swap); omitted/unknown → default chain. */
+export interface EnrichRequest {
+  modelId?: string;
+}
 export interface EnrichResponse {
   capture: Capture; // enrichStatus 'done' | 'failed'
+}
+
+/** GET /api/models — the selectable enrichment models (registry entries
+ *  whose provider has credentials configured), for a model picker UI. */
+export interface ModelOption {
+  id: string; // ModelDefinition.id — pass back as EnrichRequest.modelId
+  name: string;
+  free: boolean;
+}
+export interface ListModelsResponse {
+  models: ModelOption[];
 }
 
 /** GET /api/captures?status=<CaptureStatus|all>&q=<text>&limit=50

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { Inbox, LibraryBig } from 'lucide-react';
 import { useCaptureStore } from '@/stores/captureStore';
 import { MuteToggle } from './MuteToggle';
+import { ModelPicker } from './ModelPicker';
 
 /**
  * The only translucent chrome in the app — content genuinely scrolls
@@ -32,6 +33,7 @@ export function AppHeader() {
         </Link>
 
         <nav className="flex items-center gap-1">
+          <ModelPicker />
           <MuteToggle />
           <Link
             href="/inbox"

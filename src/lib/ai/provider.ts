@@ -1,11 +1,12 @@
-import type { AIProvider, AIProviderType, ModelDefinition } from '@/types';
+import type { AIProvider, AIProviderType, ModelDefinition, ModelOption } from '@/types';
 import { OpenAIProvider } from './openai';
 import { OpenRouterProvider } from './openrouter';
 import { OllamaProvider } from './ollama';
 
 // ─── Model Registry ────────────────────────────────────────────
-// v2 has one AI job (enrichment) and no settings UI: the model is
-// always picked by the default chain below.
+// The default chain below picks a model automatically. A user can also
+// force one specific model per enrich call (see enrich.ts) — e.g. to
+// compare candidates before settling on one.
 
 export const MODEL_REGISTRY: ModelDefinition[] = [
   {
@@ -29,6 +30,26 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     free: true,
   },
   {
+    id: 'deepseek-v4-flash',
+    name: 'DeepSeek V4 Flash',
+    provider: 'openrouter',
+    modelId: 'deepseek/deepseek-v4-flash',
+    costInput: 0.077,
+    costOutput: 0.154,
+    contextWindow: 1048576,
+    free: false,
+  },
+  {
+    id: 'deepseek-v4-pro',
+    name: 'DeepSeek V4 Pro',
+    provider: 'openrouter',
+    modelId: 'deepseek/deepseek-v4-pro',
+    costInput: 0.435,
+    costOutput: 0.87,
+    contextWindow: 1048576,
+    free: false,
+  },
+  {
     id: 'gpt-4o-mini',
     name: 'GPT-4o Mini',
     provider: 'openai',
@@ -39,6 +60,22 @@ export const MODEL_REGISTRY: ModelDefinition[] = [
     free: false,
   },
 ];
+
+/** Does this provider have the credentials it needs to actually run? */
+function providerConfigured(provider: AIProviderType): boolean {
+  if (provider === 'ollama') return process.env.OLLAMA_ENABLED === 'true';
+  if (provider === 'openrouter') return !!process.env.OPENROUTER_KEY;
+  return !!process.env.OPENAI_API_KEY;
+}
+
+/** Selectable models for a picker UI — registry entries with a working key. */
+export function getSelectableModels(): ModelOption[] {
+  return MODEL_REGISTRY.filter((m) => providerConfigured(m.provider)).map((m) => ({
+    id: m.id,
+    name: m.name,
+    free: m.free,
+  }));
+}
 
 export function getModelById(id: string): ModelDefinition | undefined {
   return MODEL_REGISTRY.find((m) => m.id === id);

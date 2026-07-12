@@ -1,6 +1,23 @@
 # Session Log
 Newest first. Append-only at the top; roll old halves into archive/ past ~300 lines.
 
+## 2026-07-12 — v2.2: selectable enrichment model (DeepSeek V4 Flash/Pro)
+- User set the real Vercel password to `nexus6969`; local NEXUS_TOKEN updated via setx to match.
+- Added DeepSeek V4 Flash + DeepSeek V4 Pro (OpenRouter) to the model registry, alongside
+  the existing Ollama/Gemma-free/gpt-4o-mini entries. New `GET /api/models` (credential-gated,
+  public-safe shape). `POST .../enrich` now takes optional `{modelId}`; when given, tries
+  ONLY that model — single attempt, no fallback masking — so a real A/B test reflects that
+  model's actual behavior. Header gained a `ModelPicker` (next to mute) listing "Auto" +
+  live registry; preference persists client-side in localStorage, not a server setting.
+- Implemented directly (no subagents — small, well-understood, single-session change).
+  Verified live: GET /api/models lists all 4 models; forced `deepseek-v4-flash` on a real
+  URL capture, resolved `enrichStatus: 'done'` with a correct title in one call.
+- Acceptance extended to 75 checks (added GET /api/models + forced-model enrich), ALL PASS.
+  `npx tsc --noEmit` clean, `npm run build` clean.
+- Open: user still wants to try GLM 5.2 / compare quality across models in real use before
+  settling; xAI/X scraping needs a paid API tier the user doesn't have yet (Firecrawl/Jina
+  hit X's block wall) — flagged, not solved this session.
+
 ## 2026-07-12 — v2.1 shipped: Library, Ask Nexus, multi-route, delete, premium design pass
 - v2.0 confirmed live on prod first: user bought **mynexus.lol**, resumed the paused Vercel
   project, domain wired (www redirect + login gate verified). SecondBrainOS registration pushed.
