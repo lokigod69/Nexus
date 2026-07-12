@@ -36,6 +36,14 @@ body {
   color: var(--color-ink);
 }
 
+html {
+  /* Press feedback is ours (scale 0.97), not the UA's grey flash. */
+  -webkit-tap-highlight-color: transparent;
+  /* Firefox scrollbars, tuned to the palette (inherited). */
+  scrollbar-color: var(--color-line) transparent;
+  scrollbar-width: thin;
+}
+
 body {
   font-family: var(--font-sans);
   font-size: 1rem;
@@ -57,6 +65,16 @@ button,
     border-color 140ms ease-out,
     color 140ms ease-out,
     opacity 140ms ease-out;
+  touch-action: manipulation; /* no double-tap zoom delay on iOS */
+}
+
+/* Links share the color/background acknowledgement buttons already have. */
+a {
+  transition:
+    background-color 140ms ease-out,
+    border-color 140ms ease-out,
+    color 140ms ease-out;
+  touch-action: manipulation;
 }
 
 button:active:not(:disabled),
@@ -73,16 +91,22 @@ button:disabled {
   cursor: default;
 }
 
-/* Keyboard focus — one accent, visible, no default-blue */
+/* Keyboard focus — one accent, visible, no default-blue.
+   The outline follows the element's own border-radius; never mutate it. */
 :focus-visible {
   outline: 2px solid color-mix(in oklab, var(--color-accent) 70%, transparent);
   outline-offset: 2px;
-  border-radius: 6px;
 }
 
 textarea:focus-visible,
 input:focus-visible {
   outline: none; /* fields carry their own focus border */
+}
+
+/* The caret belongs to the accent — the one place amber lives in a field. */
+input,
+textarea {
+  caret-color: var(--color-accent);
 }
 
 /* ------------------------------------------------------------------
@@ -166,6 +190,12 @@ input:focus-visible {
   *::before,
   *::after {
     scroll-behavior: auto !important;
+  }
+
+  /* Press acknowledgement stays as a color change; the scale is motion. */
+  button:active:not(:disabled),
+  [role="button"]:active {
+    transform: none;
   }
 }
 

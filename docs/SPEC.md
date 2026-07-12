@@ -119,3 +119,42 @@ Auth: sends `x-nexus-token: <token>` when a token is provided (middleware accept
 - Backend + CLI: `scripts/acceptance.mjs` (see file header for how to run). ALL PASS required.
 - Everything: `npm run build` clean (type-check is the gate).
 - Frontend: architect review in the browser against the design contract (sign-off pass).
+
+---
+
+# v2.1 addendum — Library, Ask, multi-route, delete (2026-07-12)
+
+Same priority order: acceptance.mjs > types > this prose. Design contract above still binding.
+
+## Multi-target routing
+`Capture.project` became `Capture.projects: string[]` (empty = unrouted). PATCH takes
+`projects: [1+ slugs]`; empty array → 400. Pull items carry `targets[]`; the CLI writes one
+raw file per target ('general'/missing-path targets → SecondBrainOS/memory/raw/) and acks a
+capture only after ALL its targets are written.
+**MIGRATION (prod-critical):** the prod Turso `captures` table exists with the old `project`
+TEXT column. `ensureTables()` must detect a missing `projects` column via PRAGMA table_info,
+ALTER TABLE ADD COLUMN, and backfill `projects` from non-null `project` values
+(`['<old>']`). Old column stays in place, ignored. Never DROP.
+
+## Delete
+DELETE /api/captures/[id] (existed) is now surfaced in the UI everywhere a capture appears.
+Deleting affects Nexus's records only — files already delivered into project memory/raw/
+stay on disk (say so in the confirm affordance for delivered captures).
+
+## Library (/library)
+GET /api/captures gains `q` (case-insensitive substring over title/summary/takeaway/
+tags/content — plain SQL LIKE, NO embeddings) and `status=all`. The Library view shows the
+full capture history with instant search, status filter chips, routed-to labels, and delete.
+
+## Ask (POST /api/ask)
+One-shot Q&A over the capture history. Server-side: SQL retrieval (recent N + LIKE matches
+on question keywords, ~30 candidates max), one AIProvider completion (same fallback chain as
+enrich) that must answer ONLY from the provided captures and cite which ones. Response:
+{ answer, references[] } where references ⊆ retrieved candidates. Empty question → 400.
+AI failure → 502 { error } — never a fabricated 200. No conversation persistence, no
+streaming (single-shot). Scope honesty: Ask knows captures only, not project memory files.
+
+## Quick-route from the capture screen
+Once enrichment lands on `/`, the suggestion chip becomes actionable: tap to confirm the
+suggested project immediately; a compact picker (multi-select, same as inbox) is one step
+away. No detour through /inbox for the common case.

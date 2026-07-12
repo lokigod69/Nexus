@@ -31,8 +31,9 @@ export interface Capture {
   suggestedProject: string | null;
   /** One short sentence: why the AI thinks it belongs there. */
   suggestedReason: string | null;
-  /** Human-confirmed project slug. Set when status becomes 'routed'. */
-  project: string | null;
+  /** Human-confirmed target project slugs (1+ = routed; a capture can be
+   *  delivered to several brains). Empty array = not routed. */
+  projects: string[];
   status: CaptureStatus;
   enrichStatus: EnrichStatus;
   /** Trimmed scraped markdown (URL captures), max ~8000 chars. */
@@ -78,15 +79,19 @@ export interface EnrichResponse {
   capture: Capture; // enrichStatus 'done' | 'failed'
 }
 
-/** GET /api/captures?status=<CaptureStatus>&limit=50 (default status=inbox) */
+/** GET /api/captures?status=<CaptureStatus|all>&q=<text>&limit=50
+ *  (default status=inbox). `q` is a case-insensitive substring search over
+ *  title, summary, takeaway, tags, and content. `status=all` spans every
+ *  status — the Library view. */
 export interface ListCapturesResponse {
   captures: Capture[];
 }
 
 /** PATCH /api/captures/[id] — route, archive, restore, or edit. */
 export interface UpdateCaptureRequest {
-  /** slug or 'general' → sets status 'routed' + routedAt. */
-  project?: string;
+  /** 1+ slugs (registry or 'general') → sets status 'routed' + routedAt.
+   *  A capture can target several project brains at once. */
+  projects?: string[];
   /** 'archived' to drop, 'inbox' to restore. */
   status?: Extract<CaptureStatus, 'inbox' | 'archived'>;
   title?: string;
@@ -111,23 +116,50 @@ export interface SyncProjectsResponse {
   count: number;
 }
 
-/** GET /api/pull — everything routed and not yet delivered. */
+/** GET /api/pull — everything routed and not yet delivered. One item per
+ *  capture; `targets` has one entry per routed project slug. */
+export interface PullTarget {
+  slug: string;
+  /** Registry name; null for 'general' or unknown slugs. */
+  name: string | null;
+  /** Resolved local path; null for 'general' or unknown slugs (the CLI
+   *  writes those to SecondBrainOS/memory/raw/). */
+  path: string | null;
+}
 export interface PullItem {
   capture: Capture;
-  /** Resolved local path for the routed project; null for 'general'. */
-  projectPath: string | null;
-  projectName: string | null;
+  targets: PullTarget[];
 }
 export interface PullResponse {
   items: PullItem[];
 }
 
-/** POST /api/pull/ack — mark written captures delivered. */
+/** POST /api/pull/ack — mark captures delivered. The CLI acks a capture id
+ *  only after writing files for ALL of its targets. */
 export interface AckRequest {
   ids: string[];
 }
 export interface AckResponse {
   acked: number;
+}
+
+/** POST /api/ask — one-shot question over the full capture history.
+ *  Retrieval is plain SQL (recency + substring match), no embeddings.
+ *  AI failure returns { error } with a 502 — never a fabricated answer. */
+export interface AskRequest {
+  question: string;
+}
+export interface AskReference {
+  id: string;
+  title: string | null;
+  status: CaptureStatus;
+  projects: string[];
+  url: string | null;
+}
+export interface AskResponse {
+  answer: string;
+  /** Captures the answer is grounded in, for display beneath it. */
+  references: AskReference[];
 }
 
 // ------------------------------------------------------------

@@ -1,28 +1,35 @@
 # Current State
-Last updated: 2026-07-11
+Last updated: 2026-07-12
 
 ## What this is
 The front door to raw/: capture links/thoughts from any device → AI enrich + project-brain
 routing suggestion → one-tap confirm → `npm run pull` delivers into `<project>/memory/raw/`.
-Deliberately small. No embeddings, no 3D, no chat (all of that was v1, deleted).
+Plus (v2.1) a Library over the full capture history and Ask Nexus, a one-shot AI Q&A scoped
+to captures only. Still no embeddings, no 3D, no open-ended chat.
 
-## Working now (verified in browser + acceptance 2026-07-11)
-- Full loop end-to-end: capture → enrich → route → pull → raw/ file (real deliveries made
-  into TRADERBOT and SecondBrainOS memory/raw/ during sign-off).
-- `scripts/acceptance.mjs`: 48/48 pass (canonical behavioral contract; see file header).
-- Capture screen `/`: autofocus, paste-and-go, Ctrl/⌘+Enter, optimistic card, live enrichment.
-- Inbox `/inbox`: suggestion chip with reason, Route to X / Change project / Archive capture,
-  spring exits, inbox-zero state.
-- AI enrichment with runtime fallback chain (OpenRouter free 429s constantly → falls through
-  to gpt-4o-mini). Enrich never 500s; failures degrade to `enrichStatus: 'failed'` + retry UI.
-- Pull CLI `scripts/nexus-pull.mjs`: PROJECTS.md registry sync up, frontmatter raw files,
-  collision suffixes, missing-path fallback to SecondBrainOS/memory/raw/.
-- Sounds (cuelume): press/release on capture button, success on enrich, tick on route.
-  Mute toggle persisted. First real-world test of the cuelume library.
-- PWA manifest with share_target (GET → `/?text=`) for phone share sheets.
+## Working now (verified via acceptance + Playwright screenshots 2026-07-12)
+- LIVE at https://www.mynexus.lol (Vercel nexus-oz7q, login gate verified; user's domain
+  via Porkbun, bare → www redirect).
+- Full loop end-to-end: capture → enrich → route (multi-target) → pull → one raw/ file per
+  target project.
+- `scripts/acceptance.mjs`: 70/70 pass (canonical contract; see file header for the
+  NEXUS_LOCAL_DB=1 requirement).
+- Capture `/`: autofocus, paste-and-go, Ctrl/⌘+Enter, optimistic card, live enrichment with
+  staggered "receive" animation, quick-route from the suggestion chip, compact multi-picker.
+- Inbox `/inbox`: suggestion chip + reason, multi-select routing, archive, delete.
+- Library `/library`: full history, instant SQL search (q= over title/summary/takeaway/tags/
+  content), status chips, routed-to trails, delete + restore.
+- Ask Nexus (`POST /api/ask`): SQL retrieval (no embeddings) + one completion → answer with
+  grounded reference cards; 502 when AI unavailable, never fabricated. Verified with a real
+  "where did X end up" question.
+- Delete everywhere, inline morph confirm; delivered captures note the file stays on disk.
+- AI runtime fallback chain (OpenRouter free 429s constantly → gpt-4o-mini); enrich never 500s.
+- Pull CLI: registry sync up, multi-target writes, ack only after all targets written,
+  missing-path fallback to SecondBrainOS/memory/raw/. `Pull Nexus.bat` on the user's desktop.
+- cuelume sounds (3 moments + mute), PWA share_target, full reduced-motion support.
 
 ## In progress
-- Nothing mid-flight. v2 rebuild shipped 2026-07-11.
+- Nothing mid-flight. v2.1 shipped 2026-07-12.
 
 ## Known problems
 - OpenRouter free-tier model (`gemma-4-26b:free`) 429s near-permanently; the chain falls back
@@ -38,12 +45,12 @@ Deliberately small. No embeddings, no 3D, no chat (all of that was v1, deleted).
 - Nexus itself is now in PROJECTS.md — captures about Nexus can route to its own brain.
 
 ## Next actions
-1. **HUMAN: resume the paused Vercel project.** nexus-oz7q is PAUSED (prod 503s with
-   `x-vercel-error: DEPLOYMENT_PAUSED`; pushed deployments sit in UNKNOWN and never build).
-   Vercel dashboard → nexus-oz7q → resume, then the queued build should run (or redeploy).
-   v2 is pushed (commits 2f09f82 + aa1b65c) and repo is CLI-linked (.vercel/, gitignored).
-   Also: delete the second unused Vercel project `nexus` (builds fail, no env vars) and
-   push SecondBrainOS (registration commit 02a9615 is local-only; push was permission-blocked).
-2. Verify prod after resume: login gate (NEXUS_PASSWORD), capture from phone, then set
-   NEXUS_URL + NEXUS_TOKEN (= NEXUS_PASSWORD) locally so `npm run pull` targets prod.
-3. Use it for a week from phone + desktop; then decide on pull automation (open question 1).
+1. **HUMAN:** pick/confirm the NEXUS_PASSWORD value in Vercel (≥8 chars recommended over a
+   4-digit PIN), then locally run `setx NEXUS_TOKEN "<that password>"` and reopen the
+   terminal — after that `Pull Nexus.bat` / `npm run pull` targets prod with zero flags.
+   (NEXUS_URL is already set locally to https://www.mynexus.lol. The NEXUS_URL/NEXUS_TOKEN
+   entries the user added in VERCEL env are inert — harmless, deletable.)
+2. **HUMAN:** install the PWA on the phone (Share → Add to Home Screen) and judge the
+   sounds/feel by hand; delete the unused second Vercel project `nexus` in the dashboard.
+3. Use it for a week; then decide on pull automation (open question 1) and whether Ask/
+   Library need anything more.

@@ -24,8 +24,9 @@ const client = createClient(
 const db = drizzle(client, { schema });
 
 // Bootstrap v2 tables only (CREATE TABLE IF NOT EXISTS — no runtime
-// migrations). NEVER drop or alter v1 tables (signals, tags, …): prod
-// Turso still holds the user's v1 data.
+// schema rewrites beyond the additive v2.1 column below). NEVER drop or
+// alter v1 tables (signals, tags, …): prod Turso still holds the user's
+// v1 data.
 async function ensureTables() {
   await client.executeMultiple(`
     CREATE TABLE IF NOT EXISTS captures (
@@ -39,7 +40,7 @@ async function ensureTables() {
       tags TEXT NOT NULL DEFAULT '[]',
       suggested_project TEXT,
       suggested_reason TEXT,
-      project TEXT,
+      projects TEXT NOT NULL DEFAULT '[]',
       status TEXT NOT NULL DEFAULT 'inbox',
       enrich_status TEXT NOT NULL DEFAULT 'pending',
       extract TEXT,
@@ -57,6 +58,25 @@ async function ensureTables() {
       synced_at INTEGER NOT NULL
     );
   `);
+
+  // v2.0 → v2.1 migration (prod-critical, additive only). The prod Turso
+  // `captures` table predates the `projects` column and carries the legacy
+  // `project` TEXT column with live rows. Detect, ADD COLUMN, backfill.
+  // The old `project` column stays in place forever — never DROP/rename.
+  const info = await client.execute(
+    `select name from pragma_table_info('captures')`
+  );
+  const cols = info.rows.map((r) => String(r.name));
+  if (!cols.includes('projects')) {
+    await client.execute(
+      `ALTER TABLE captures ADD COLUMN projects TEXT NOT NULL DEFAULT '[]'`
+    );
+    if (cols.includes('project')) {
+      await client.execute(
+        `UPDATE captures SET projects = json_array(project) WHERE project IS NOT NULL AND projects = '[]'`
+      );
+    }
+  }
 }
 
 // Kick off table creation at module load; query helpers await this so the

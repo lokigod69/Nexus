@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { db, dbReady } from './index';
 import { captures, projects } from './schema';
 import type {
@@ -8,6 +8,7 @@ import type {
   CaptureStatus,
   EnrichStatus,
   PullItem,
+  PullTarget,
 } from '@/types';
 import { GENERAL_PROJECT_SLUG } from '@/types';
 
@@ -20,7 +21,8 @@ const now = () => Math.floor(Date.now() / 1000);
 // Row mapping
 // ============================================================
 
-function parseTags(raw: string | null): string[] {
+/** Parse a JSON-encoded string[] column ('tags', 'projects'). */
+function parseStringArray(raw: string | null): string[] {
   if (!raw) return [];
   try {
     const parsed = JSON.parse(raw);
@@ -42,10 +44,10 @@ function rowToCapture(row: CaptureRow): Capture {
     title: row.title ?? null,
     summary: row.summary ?? null,
     takeaway: row.takeaway ?? null,
-    tags: parseTags(row.tags),
+    tags: parseStringArray(row.tags),
     suggestedProject: row.suggestedProject ?? null,
     suggestedReason: row.suggestedReason ?? null,
-    project: row.project ?? null,
+    projects: parseStringArray(row.projects),
     status: row.status as CaptureStatus,
     enrichStatus: row.enrichStatus as EnrichStatus,
     extract: row.extract ?? null,
@@ -67,6 +69,33 @@ function rowToProject(row: ProjectRow): BrainProject {
 }
 
 // ============================================================
+// Search (plain SQL LIKE — no embeddings, ever)
+// ============================================================
+
+/** Escape LIKE wildcards; queries use ESCAPE '!'. */
+function escapeLike(term: string): string {
+  return term.replace(/[!%_]/g, (m) => `!${m}`);
+}
+
+/** Case-insensitive substring condition over the searchable columns:
+ *  title, summary, takeaway, tags, content. */
+function likeCondition(term: string): SQL {
+  const pattern = `%${escapeLike(term.toLowerCase())}%`;
+  const fields = [
+    captures.title,
+    captures.summary,
+    captures.takeaway,
+    captures.tags,
+    captures.content,
+  ];
+  return or(
+    ...fields.map(
+      (f) => sql`lower(coalesce(${f}, '')) LIKE ${pattern} ESCAPE '!'`
+    )
+  )!;
+}
+
+// ============================================================
 // Captures
 // ============================================================
 
@@ -85,6 +114,7 @@ export async function createCapture(data: {
       url: data.url,
       source: data.source,
       tags: '[]',
+      projects: '[]',
       createdAt: now(),
     })
     .returning()
@@ -98,18 +128,23 @@ export async function getCapture(id: string): Promise<Capture | null> {
   return row ? rowToCapture(row) : null;
 }
 
+/** List captures. status 'all' spans every status (the Library view);
+ *  `q` is a case-insensitive substring search (SQL LIKE, no embeddings). */
 export async function listCaptures(
-  status: CaptureStatus = 'inbox',
-  limit = 50
+  status: CaptureStatus | 'all' = 'inbox',
+  limit = 50,
+  q?: string
 ): Promise<Capture[]> {
   await dbReady;
-  const rows = await db
-    .select()
-    .from(captures)
-    .where(eq(captures.status, status))
-    .orderBy(desc(captures.createdAt))
-    .limit(limit)
-    .all();
+  const conditions: SQL[] = [];
+  if (status !== 'all') conditions.push(eq(captures.status, status));
+  const term = q?.trim();
+  if (term) conditions.push(likeCondition(term));
+
+  let query = db.select().from(captures).$dynamic();
+  if (conditions.length > 0) query = query.where(and(...conditions));
+
+  const rows = await query.orderBy(desc(captures.createdAt)).limit(limit).all();
   return rows.map(rowToCapture);
 }
 
@@ -120,7 +155,7 @@ export interface CaptureUpdate {
   tags?: string[];
   suggestedProject?: string | null;
   suggestedReason?: string | null;
-  project?: string;
+  projects?: string[];
   status?: CaptureStatus;
   enrichStatus?: EnrichStatus;
   extract?: string | null;
@@ -134,9 +169,10 @@ export async function updateCapture(
   patch: CaptureUpdate
 ): Promise<Capture | null> {
   await dbReady;
-  const { tags, ...rest } = patch;
+  const { tags, projects: projectSlugs, ...rest } = patch;
   const set: Record<string, unknown> = { ...rest };
   if (tags !== undefined) set.tags = JSON.stringify(tags);
+  if (projectSlugs !== undefined) set.projects = JSON.stringify(projectSlugs);
   if (Object.keys(set).length === 0) return getCapture(id);
 
   const row = await db
@@ -148,13 +184,14 @@ export async function updateCapture(
   return row ? rowToCapture(row) : null;
 }
 
-/** Route a capture to a project: sets project + status 'routed' + routedAt. */
+/** Route a capture to one or more project brains: sets projects +
+ *  status 'routed' + routedAt. Caller guarantees 1+ slugs. */
 export async function routeCapture(
   id: string,
-  projectSlug: string
+  projectSlugs: string[]
 ): Promise<Capture | null> {
   return updateCapture(id, {
-    project: projectSlug,
+    projects: projectSlugs,
     status: 'routed',
     routedAt: now(),
   });
@@ -168,6 +205,48 @@ export async function deleteCapture(id: string): Promise<boolean> {
     .returning()
     .get();
   return !!row;
+}
+
+// ============================================================
+// Ask retrieval (plain SQL: recency + keyword LIKE, no embeddings)
+// ============================================================
+
+/** Candidate captures for /api/ask: union of the most recent `recentLimit`
+ *  and any capture matching a question keyword (LIKE over the same columns
+ *  as search), deduped by id, capped at `cap` total. */
+export async function getAskCandidates(
+  keywords: string[],
+  recentLimit = 15,
+  cap = 30
+): Promise<Capture[]> {
+  await dbReady;
+  const recent = await db
+    .select()
+    .from(captures)
+    .orderBy(desc(captures.createdAt))
+    .limit(recentLimit)
+    .all();
+
+  let matches: CaptureRow[] = [];
+  if (keywords.length > 0) {
+    matches = await db
+      .select()
+      .from(captures)
+      .where(or(...keywords.map((k) => likeCondition(k))))
+      .orderBy(desc(captures.createdAt))
+      .limit(cap)
+      .all();
+  }
+
+  const seen = new Set<string>();
+  const combined: Capture[] = [];
+  for (const row of [...recent, ...matches]) {
+    if (!row.id || seen.has(row.id)) continue;
+    seen.add(row.id);
+    combined.push(rowToCapture(row));
+    if (combined.length >= cap) break;
+  }
+  return combined;
 }
 
 // ============================================================
@@ -209,26 +288,34 @@ export async function listProjects(): Promise<BrainProject[]> {
 // Pull (routed → delivered handoff)
 // ============================================================
 
-/** Everything routed and not yet delivered, with resolved project paths.
- *  'general' (or an unknown slug) resolves to a null path/name. */
+/** Everything routed and not yet delivered. One item per capture; `targets`
+ *  has one entry per routed slug, resolved against the registry. 'general'
+ *  (or an unknown slug) resolves to null name/path — the CLI writes those
+ *  to SecondBrainOS/memory/raw/. */
 export async function getPullItems(): Promise<PullItem[]> {
   await dbReady;
   const rows = await db
     .select()
     .from(captures)
-    .leftJoin(projects, eq(captures.project, projects.slug))
     .where(eq(captures.status, 'routed'))
     .orderBy(asc(captures.routedAt))
     .all();
 
+  const registry = await db.select().from(projects).all();
+  const bySlug = new Map(registry.map((p) => [p.slug, p]));
+
   return rows.map((row) => {
-    const capture = rowToCapture(row.captures);
-    const isGeneral = capture.project === GENERAL_PROJECT_SLUG;
-    return {
-      capture,
-      projectPath: isGeneral ? null : row.projects?.path ?? null,
-      projectName: isGeneral ? null : row.projects?.name ?? null,
-    };
+    const capture = rowToCapture(row);
+    const targets: PullTarget[] = capture.projects.map((slug) => {
+      const project =
+        slug === GENERAL_PROJECT_SLUG ? undefined : bySlug.get(slug);
+      return {
+        slug,
+        name: project?.name ?? null,
+        path: project?.path ?? null,
+      };
+    });
+    return { capture, targets };
   });
 }
 

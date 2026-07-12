@@ -2,19 +2,20 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Inbox } from 'lucide-react';
+import { Inbox, LibraryBig } from 'lucide-react';
 import { useCaptureStore } from '@/stores/captureStore';
 import { MuteToggle } from './MuteToggle';
 
 /**
  * The only translucent chrome in the app — content genuinely scrolls
- * beneath it. Identical on both screens for spatial consistency.
+ * beneath it. Identical on every screen for spatial consistency.
  */
 export function AppHeader() {
   const pathname = usePathname();
   const count = useCaptureStore((s) => s.captures.length);
   const loaded = useCaptureStore((s) => s.inboxLoaded);
   const onInbox = pathname === '/inbox';
+  const onLibrary = pathname === '/library';
 
   return (
     <header className="chrome sticky top-0 z-40">
@@ -47,6 +48,17 @@ export function AppHeader() {
                 {count}
               </span>
             )}
+          </Link>
+          <Link
+            href="/library"
+            className={`flex h-11 items-center gap-2 rounded-lg px-3 text-[14px] font-medium ${
+              onLibrary
+                ? 'bg-elevated text-ink'
+                : 'text-ink-secondary hover:bg-elevated hover:text-ink'
+            }`}
+          >
+            <LibraryBig size={16} aria-hidden />
+            <span>Library</span>
           </Link>
         </nav>
         <div className="chrome-edge" aria-hidden />

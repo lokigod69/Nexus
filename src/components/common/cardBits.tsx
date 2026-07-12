@@ -24,20 +24,47 @@ export function CardMeta({ capture }: { capture: Capture }) {
   );
 }
 
+/**
+ * The AI's routing suggestion. Static by default; pass `onClick` and it
+ * becomes the quick-route fast path — one tap commits to that project.
+ */
 export function SuggestionChip({
   label,
   reason,
+  onClick,
+  disabled = false,
 }: {
   label: string;
   reason: string | null;
+  onClick?: () => void;
+  disabled?: boolean;
 }) {
+  const text = (
+    <span className="min-w-0">
+      <span className="font-medium text-accent-strong">{label}</span>
+      {reason && <span className="text-ink-secondary"> · {reason}</span>}
+    </span>
+  );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        aria-label={`Route to ${label}`}
+        className="inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-accent/25 bg-accent/10 px-3 py-1.5 text-left text-[13px] leading-snug hover:border-accent/45 hover:bg-accent/15 disabled:opacity-40"
+      >
+        <Sparkles size={13} aria-hidden className="shrink-0 text-accent" />
+        {text}
+      </button>
+    );
+  }
+
   return (
     <div className="inline-flex max-w-full items-start gap-2 rounded-lg border border-accent/25 bg-accent/10 px-2.5 py-1.5 text-[13px] leading-snug">
       <Sparkles size={13} aria-hidden className="mt-0.5 shrink-0 text-accent" />
-      <span className="min-w-0">
-        <span className="font-medium text-accent-strong">{label}</span>
-        {reason && <span className="text-ink-secondary"> — {reason}</span>}
-      </span>
+      {text}
     </div>
   );
 }

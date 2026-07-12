@@ -28,8 +28,9 @@ export async function GET(_request: NextRequest, { params }: Params) {
 }
 
 /** PATCH /api/captures/[id] — route, archive, restore, or edit.
- *  Per UpdateCaptureRequest: project → status 'routed' + routedAt now;
- *  status 'archived'/'inbox' transitions; title/tags edits. */
+ *  Per UpdateCaptureRequest: projects (1+ slugs) → status 'routed' +
+ *  routedAt now; empty projects array → 400; status 'archived'/'inbox'
+ *  transitions; title/tags edits. */
 export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     const { id } = await params;
@@ -45,10 +46,26 @@ export async function PATCH(request: NextRequest, { params }: Params) {
 
     const patch: CaptureUpdate = {};
 
-    if (body.project !== undefined) {
-      if (typeof body.project !== 'string' || !body.project.trim()) {
-        return NextResponse.json({ error: 'project must be a non-empty slug' }, { status: 400 });
+    let routeSlugs: string[] | undefined;
+    if (body.projects !== undefined) {
+      const raw: unknown = body.projects;
+      if (
+        !Array.isArray(raw) ||
+        raw.some((p: unknown) => typeof p !== 'string' || !p.trim())
+      ) {
+        return NextResponse.json(
+          { error: 'projects must be an array of non-empty slugs' },
+          { status: 400 }
+        );
       }
+      const slugs = [...new Set((raw as string[]).map((p) => p.trim()))];
+      if (slugs.length === 0) {
+        return NextResponse.json(
+          { error: 'projects must contain at least one slug' },
+          { status: 400 }
+        );
+      }
+      routeSlugs = slugs;
     }
 
     if (body.status !== undefined) {
@@ -75,11 +92,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       patch.tags = body.tags;
     }
 
-    // Routing wins: sets project + status 'routed' + routedAt.
+    // Routing wins: sets projects + status 'routed' + routedAt.
     let capture;
-    if (typeof body.project === 'string') {
+    if (routeSlugs) {
       if (Object.keys(patch).length > 0) await updateCapture(id, patch);
-      capture = await routeCapture(id, body.project.trim());
+      capture = await routeCapture(id, routeSlugs);
     } else {
       capture = await updateCapture(id, patch);
     }

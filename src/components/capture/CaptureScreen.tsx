@@ -142,14 +142,14 @@ export function CaptureScreen({ initialText = '' }: { initialText?: string }) {
           </div>
 
           {inboxLoaded && recent.length === 0 ? (
-            <p className="mt-6 text-sm leading-relaxed text-ink-secondary">
+            <p className="mt-6 text-pretty text-sm leading-relaxed text-ink-secondary">
               Nothing captured yet. Paste a link above and it lands here.
             </p>
           ) : (
             <ul className="mt-4 flex flex-col gap-3">
               <AnimatePresence initial={false}>
-                {recent.map((c) => (
-                  <CaptureCard key={c.id} capture={c} />
+                {recent.map((c, i) => (
+                  <CaptureCard key={c.id} capture={c} index={i} />
                 ))}
               </AnimatePresence>
             </ul>

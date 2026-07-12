@@ -30,7 +30,7 @@ function makeOptimisticCapture(content: string): Capture {
     tags: [],
     suggestedProject: null,
     suggestedReason: null,
-    project: null,
+    projects: [],
     status: 'inbox',
     enrichStatus: 'pending',
     extract: null,
@@ -54,10 +54,12 @@ interface CaptureStore {
   capture: (content: string) => Promise<boolean>;
   /** (Re-)fires enrichment for a capture; plays 'success' on completion. */
   enrich: (id: string) => Promise<void>;
-  /** Confirm a routing target. Removes the card on success. */
-  route: (id: string, projectSlug: string) => Promise<boolean>;
+  /** Confirm 1+ routing targets. Plays 'tick' + removes the card on success. */
+  route: (id: string, projectSlugs: string[]) => Promise<boolean>;
   /** Archive a capture. Removes the card on success. */
   archive: (id: string) => Promise<boolean>;
+  /** Delete a capture from Nexus's records. Removes the card on success. */
+  deleteCapture: (id: string) => Promise<boolean>;
 }
 
 function replaceCapture(list: Capture[], id: string, next: Capture): Capture[] {
@@ -127,10 +129,13 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     }
   },
 
-  route: async (id: string, projectSlug: string) => {
+  route: async (id: string, projectSlugs: string[]) => {
+    if (projectSlugs.length === 0) return false;
     try {
-      await api.updateCapture(id, { project: projectSlug });
+      await api.updateCapture(id, { projects: projectSlugs });
       set((s) => ({ captures: s.captures.filter((c) => c.id !== id) }));
+      // The one route-confirm sound, wherever the commit came from.
+      playCue('tick');
       return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not route the capture');
@@ -145,6 +150,17 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
       return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not archive the capture');
+      return false;
+    }
+  },
+
+  deleteCapture: async (id: string) => {
+    try {
+      await api.deleteCapture(id);
+      set((s) => ({ captures: s.captures.filter((c) => c.id !== id) }));
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete the capture');
       return false;
     }
   },

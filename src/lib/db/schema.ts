@@ -20,7 +20,10 @@ export const captures = sqliteTable('captures', {
   tags: text('tags').notNull().default('[]'), // JSON string[]
   suggestedProject: text('suggested_project'),
   suggestedReason: text('suggested_reason'),
-  project: text('project'),
+  // v2.1: multi-target routing. JSON string[] of confirmed project slugs.
+  // The legacy v2.0 `project` TEXT column may still exist in old DBs (prod
+  // Turso) — it is never selected, written, or dropped.
+  projects: text('projects').notNull().default('[]'),
   status: text('status').notNull().default('inbox'), // inbox | routed | delivered | archived
   enrichStatus: text('enrich_status').notNull().default('pending'), // pending | done | failed
   extract: text('extract'),

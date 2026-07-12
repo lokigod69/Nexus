@@ -93,13 +93,15 @@ function parseProjectsMd(md) {
   return projects;
 }
 
-/** Raw markdown file per SPEC.md "Pull CLI": frontmatter + body. */
-function buildMarkdown(item) {
-  const c = item.capture;
+/** Raw markdown file per SPEC.md "Pull CLI": frontmatter + body.
+ *  One file per target; routed-to names THAT target ('general' when the
+ *  target has no registry name — the 'general' slug or an unknown slug). */
+function buildMarkdown(capture, target) {
+  const c = capture;
   const fm = ['---', 'source: nexus', `captured: ${isoDate(c.createdAt)}`];
   if (c.url) fm.push(`url: ${c.url}`);
   fm.push(`tags: [${(c.tags || []).join(', ')}]`);
-  fm.push(`routed-to: ${item.projectName || c.project || 'general'}`);
+  fm.push(`routed-to: ${target?.name || 'general'}`);
   fm.push('---');
 
   const heading = c.title || c.content.slice(0, 60);
@@ -152,31 +154,47 @@ async function main() {
   }
   console.log(`${items.length} capture(s) to deliver`);
 
-  // c) Write each into <project>/memory/raw/ ('general' or missing path →
-  //    SecondBrainOS/memory/raw/)
+  // c) One raw file PER TARGET into <target-path>/memory/raw/ ('general',
+  //    unknown slug, or a path missing on disk → SecondBrainOS/memory/raw/).
+  //    A capture id is acked only after ALL of its targets were written.
   const written = [];
   for (const item of items) {
     const c = item.capture;
-    let root = OS_PATH;
-    if (item.projectPath) {
-      if (existsSync(item.projectPath)) {
-        root = item.projectPath;
-      } else {
-        console.warn(`WARN: project path missing on disk: ${item.projectPath} — writing to ${OS_PATH}\\memory\\raw\\ instead`);
+    const targets =
+      Array.isArray(item.targets) && item.targets.length > 0
+        ? item.targets
+        : [{ slug: 'general', name: null, path: null }];
+
+    let allTargetsWritten = true;
+    for (const target of targets) {
+      let root = OS_PATH;
+      if (target.path) {
+        if (existsSync(target.path)) {
+          root = target.path;
+        } else {
+          console.warn(`WARN: project path missing on disk: ${target.path} — writing to ${OS_PATH}\\memory\\raw\\ instead`);
+        }
+      }
+
+      const rawDir = join(root, 'memory', 'raw');
+      const label = target.name || target.slug || 'general';
+      if (DRY_RUN) {
+        console.log(`[dry-run] would write "${c.title || c.content.slice(0, 40)}" → ${rawDir} [${label}]`);
+        continue;
+      }
+
+      try {
+        mkdirSync(rawDir, { recursive: true });
+        const filename = uniqueFilename(rawDir, c);
+        writeFileSync(join(rawDir, filename), buildMarkdown(c, target), 'utf8');
+        console.log(`  wrote ${join(rawDir, filename)} [${label}]`);
+      } catch (err) {
+        console.error(`ERROR: failed to write target "${label}" for capture ${c.id}: ${err.message}`);
+        allTargetsWritten = false;
       }
     }
 
-    const rawDir = join(root, 'memory', 'raw');
-    if (DRY_RUN) {
-      console.log(`[dry-run] would write "${c.title || c.content.slice(0, 40)}" → ${rawDir}`);
-      continue;
-    }
-
-    mkdirSync(rawDir, { recursive: true });
-    const filename = uniqueFilename(rawDir, c);
-    writeFileSync(join(rawDir, filename), buildMarkdown(item), 'utf8');
-    console.log(`  wrote ${join(rawDir, filename)}`);
-    written.push(c.id);
+    if (!DRY_RUN && allTargetsWritten) written.push(c.id);
   }
 
   // d) Ack only what was actually written

@@ -1,6 +1,40 @@
 # Decisions
 Newest first. Superseded decisions are marked, never deleted.
 
+## 2026-07-12 — Ask Nexus: SQL retrieval + one completion, scoped to captures only
+**Status:** active
+**Decision:** POST /api/ask retrieves candidates with plain SQL (recent 15 ∪ keyword LIKE,
+cap 30), sends ONE completion (same fallback chain as enrich) that must answer only from the
+provided captures and cite reference ids; AI failure → 502, never a fabricated answer. No
+embeddings, no conversation history, no streaming. Ask covers captures only — project memory
+files live on the user's disk, which the cloud app cannot read.
+**Why:** the user's real questions ("where did I put X?", "is this link still relevant?") are
+answerable from capture metadata; PROTOCOL.md §10 forbids RAG machinery; single-shot keeps
+cost and complexity near zero at personal scale. Deep project chat belongs to Claude Code
+inside each project.
+**Rejected:** embeddings/vector search (banned + unnecessary at this scale), persistent chat
+threads (v1's conductor died of exactly this weight).
+
+## 2026-07-12 — Multi-target routing via projects[] column (additive migration)
+**Status:** active (supersedes the single `project` column from 2026-07-11)
+**Decision:** `captures.projects` TEXT JSON array replaces `project`; migration is additive —
+PRAGMA-guarded ALTER ADD + json_array backfill; the legacy column is never dropped. Pull
+writes one raw file per target; a capture is acked only after ALL targets are written.
+**Why:** one capture legitimately belongs to several brains (user's case: a design skill
+relevant to two apps). Additive migration because prod Turso already held live v2.0 rows.
+**Rejected:** a deliveries junction table (over-modeled for the scale), destructive
+rename/drop (prod risk for zero benefit).
+
+## 2026-07-12 — Keep Nexus an inbox, not a knowledge base (with Library as the memory view)
+**Status:** active
+**Decision:** the answer to "is this my second brain with chat?" is: Nexus is the front door
+and the receipts drawer (Library = full history + search + where-it-went trails), the brains
+themselves stay markdown-on-disk read by agents. Delete is exposed everywhere but only
+affects Nexus's records; delivered raw/ files stay unless removed in the project itself.
+**Why:** the protocol's whole premise — plain files any agent can read — would be undermined
+by a parallel queryable store; the Library + Ask cover the genuine "where/what did I capture"
+needs without rebuilding v1.
+
 ## 2026-07-11 — Runtime AI fallback chain for enrichment
 **Status:** active
 **Decision:** `enrichCapture` walks Ollama → OpenRouter free → gpt-4o-mini at runtime per call;

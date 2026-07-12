@@ -57,12 +57,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/** GET /api/captures?status=<CaptureStatus>&limit=50 (default status=inbox) */
+/** GET /api/captures?status=<CaptureStatus|all>&q=<text>&limit=50
+ *  (default status=inbox). `q` is a case-insensitive substring search over
+ *  title, summary, takeaway, tags, and content — plain SQL LIKE. */
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = request.nextUrl;
     const statusParam = searchParams.get('status') || 'inbox';
-    if (!VALID_STATUSES.includes(statusParam as CaptureStatus)) {
+    if (statusParam !== 'all' && !VALID_STATUSES.includes(statusParam as CaptureStatus)) {
       return NextResponse.json({ error: `Invalid status: ${statusParam}` }, { status: 400 });
     }
 
@@ -71,7 +73,9 @@ export async function GET(request: NextRequest) {
       ? Math.min(Math.max(Math.floor(limitParam), 1), 200)
       : 50;
 
-    const captures = await listCaptures(statusParam as CaptureStatus, limit);
+    const q = searchParams.get('q') || undefined;
+
+    const captures = await listCaptures(statusParam as CaptureStatus | 'all', limit, q);
     const response: ListCapturesResponse = { captures };
     return NextResponse.json(response);
   } catch (error) {

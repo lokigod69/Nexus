@@ -50,15 +50,15 @@ export function InboxScreen() {
         ) : captures.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-28 text-center">
             <span aria-hidden className="h-2 w-2 rounded-full bg-accent" />
-            <p className="text-[15px] leading-relaxed text-ink-secondary">
+            <p className="text-pretty text-[15px] leading-relaxed text-ink-secondary">
               Inbox zero. Everything is where it belongs.
             </p>
           </div>
         ) : (
           <ul className="mt-6 flex flex-col gap-4">
             <AnimatePresence initial={false} mode="popLayout">
-              {captures.map((c) => (
-                <InboxCard key={c.id} capture={c} />
+              {captures.map((c, i) => (
+                <InboxCard key={c.id} capture={c} index={i} />
               ))}
             </AnimatePresence>
           </ul>

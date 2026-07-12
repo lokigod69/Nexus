@@ -1,6 +1,32 @@
 # Session Log
 Newest first. Append-only at the top; roll old halves into archive/ past ~300 lines.
 
+## 2026-07-12 — v2.1 shipped: Library, Ask Nexus, multi-route, delete, premium design pass
+- v2.0 confirmed live on prod first: user bought **mynexus.lol**, resumed the paused Vercel
+  project, domain wired (www redirect + login gate verified). SecondBrainOS registration pushed.
+  `Pull Nexus.bat` desktop shortcut created (user chose it over a scheduled task); NEXUS_URL
+  set via setx; user still needs `setx NEXUS_TOKEN "<password>"` once they choose one.
+- v2.1 built the same way as v2.0: contract first (acceptance.mjs rewritten → 70 checks;
+  types: Capture.projects string[], PullItem.targets, Ask shapes; SPEC addendum), then two
+  parallel subagents (backend / frontend), then a third design-polish subagent running
+  emil-design-eng + apple-design, then architect verification. Zero functional rework again.
+- Features: DELETE surfaced everywhere (inline morph confirm; delivered-file caveat copy);
+  multi-project routing (multi-select picker, one raw file per target, ack after all written);
+  quick-route from the capture screen (suggestion chip is now a button); /library (full
+  history, 200ms-debounced SQL search, status chips, restore); POST /api/ask (SQL retrieval
+  recent-15 ∪ keyword LIKE capped 30 → one completion with fallback chain → answer +
+  grounded references; 502 on AI failure, never fabricated).
+- PROD-CRITICAL migration verified by self-test: v2.0-shaped DB with `project` TEXT rows →
+  ALTER ADD `projects` + json_array backfill; legacy column kept; idempotent.
+- Design pass highlights: staggered "receive" animation when enrichment lands; width-morphing
+  delete confirm; layoutId sliding tab pill; caret/tap-highlight/scrollbar dark-theme details;
+  fixed a global :focus-visible border-radius bug; 375px overflow hardening (break-words,
+  2-line clamp). Constraints held (one accent, cuelume unchanged, reduced-motion intact).
+- Verified: build clean (new routes /library + /api/ask), acceptance 70/70 re-run twice by
+  architect (before + after design pass), Ask answered a real "where did X end up" correctly,
+  Playwright screenshots at 1440 + 375 reviewed (chrome-devtools MCP was down this session).
+- Open: user still hasn't judged the sounds/feel by hand on prod; NEXUS_TOKEN setx pending.
+
 ## 2026-07-11 — v2 rebuild: Nexus becomes the Second Brain capture layer (+ brain installed)
 - Executed the SecondBrainOS/PHASE2.md verdict: tore v1 (~16k LOC: 3D universe, embeddings/UMAP,
   triage, timeline, per-signal chat, conductor, enrichment plugins, exports) down to a skeleton;
