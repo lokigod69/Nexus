@@ -9,7 +9,7 @@ import { AUTO_MODEL, getPreferredModel } from './modelPreference';
 const URL_RE = /^https?:\/\/\S+$/i;
 
 /** Optimistic placeholder shown the instant the user submits. */
-function makeOptimisticCapture(content: string): Capture {
+function makeOptimisticCapture(content: string, skipEnrich: boolean): Capture {
   const trimmed = content.trim();
   const isUrl = URL_RE.test(trimmed);
   let source: string | null = null;
@@ -33,7 +33,7 @@ function makeOptimisticCapture(content: string): Capture {
     suggestedReason: null,
     projects: [],
     status: 'inbox',
-    enrichStatus: 'pending',
+    enrichStatus: skipEnrich ? 'skipped' : 'pending',
     extract: null,
     source,
     createdAt: Math.floor(Date.now() / 1000),
@@ -51,8 +51,9 @@ interface CaptureStore {
 
   fetchInbox: () => Promise<void>;
   fetchProjects: () => Promise<void>;
-  /** Optimistic create → POST → fire-and-track enrich. Returns success. */
-  capture: (content: string) => Promise<boolean>;
+  /** Optimistic create → POST → fire-and-track enrich (unless skipEnrich,
+   *  a raw "no AI" save). Returns success. */
+  capture: (content: string, skipEnrich?: boolean) => Promise<boolean>;
   /** (Re-)fires enrichment for a capture; plays 'success' on completion. */
   enrich: (id: string) => Promise<void>;
   /** Confirm 1+ routing targets. Plays 'tick' + removes the card on success. */
@@ -93,14 +94,15 @@ export const useCaptureStore = create<CaptureStore>((set, get) => ({
     }
   },
 
-  capture: async (content: string) => {
-    const optimistic = makeOptimisticCapture(content);
+  capture: async (content: string, skipEnrich = false) => {
+    const optimistic = makeOptimisticCapture(content, skipEnrich);
     set((s) => ({ captures: [optimistic, ...s.captures] }));
     try {
-      const { capture } = await api.createCapture(content);
+      const { capture } = await api.createCapture(content, skipEnrich);
       set((s) => ({ captures: replaceCapture(s.captures, optimistic.id, capture) }));
       // Enrichment is a separate, tracked call — never block the input on it.
-      void get().enrich(capture.id);
+      // A raw save skips it entirely; the card stays 'skipped' and routable.
+      if (!skipEnrich) void get().enrich(capture.id);
       return true;
     } catch (err) {
       set((s) => ({ captures: s.captures.filter((c) => c.id !== optimistic.id) }));

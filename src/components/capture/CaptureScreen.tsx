@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { AnimatePresence } from 'motion/react';
-import { ArrowRight } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { ArrowRight, Sparkles } from 'lucide-react';
 import { useCaptureStore } from '@/stores/captureStore';
 import { AppHeader } from '@/components/layout/AppHeader';
+import { spring } from '@/components/motion';
 import { CaptureCard } from './CaptureCard';
 
 const URL_RE = /^https?:\/\/\S+$/i;
@@ -16,6 +17,8 @@ const URL_RE = /^https?:\/\/\S+$/i;
  */
 export function CaptureScreen({ initialText = '' }: { initialText?: string }) {
   const [value, setValue] = useState(initialText);
+  // AI enrichment on by default; toggle off to save the capture raw.
+  const [enrichOn, setEnrichOn] = useState(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const captures = useCaptureStore((s) => s.captures);
@@ -49,10 +52,10 @@ export function CaptureScreen({ initialText = '' }: { initialText?: string }) {
       if (!trimmed) return;
       // Clear immediately — never lock the input while the request runs.
       setValue('');
-      const ok = await capture(trimmed);
+      const ok = await capture(trimmed, !enrichOn);
       if (!ok) setValue(trimmed); // give the thought back on failure
     },
-    [capture],
+    [capture, enrichOn],
   );
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -102,27 +105,15 @@ export function CaptureScreen({ initialText = '' }: { initialText?: string }) {
           />
 
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="hidden font-mono text-xs text-ink-muted sm:block">
-              <kbd className="rounded border border-line bg-elevated px-1.5 py-0.5">
-                Ctrl
-              </kbd>
-              {' / '}
-              <kbd className="rounded border border-line bg-elevated px-1.5 py-0.5">
-                ⌘
-              </kbd>
-              {' + '}
-              <kbd className="rounded border border-line bg-elevated px-1.5 py-0.5">
-                Enter
-              </kbd>
-            </span>
+            <AiEnrichToggle on={enrichOn} onToggle={() => setEnrichOn((v) => !v)} />
             <button
               type="submit"
               disabled={!value.trim()}
               data-cuelume-press
               data-cuelume-release
-              className="ml-auto flex h-11 items-center gap-2 rounded-lg bg-accent px-5 text-[15px] font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-40"
+              className="flex h-11 items-center gap-2 rounded-lg bg-accent px-5 text-[15px] font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-40"
             >
-              Capture signal
+              {enrichOn ? 'Capture signal' : 'Save raw'}
               <ArrowRight size={16} aria-hidden />
             </button>
           </div>
@@ -157,5 +148,44 @@ export function CaptureScreen({ initialText = '' }: { initialText?: string }) {
         </section>
       </main>
     </div>
+  );
+}
+
+/**
+ * AI-enrich toggle. On by default → the capture is scraped + summarized +
+ * routing-suggested. Off → "save raw": the thought is stored verbatim with
+ * no AI, still routable, and can be enriched later from its card.
+ */
+function AiEnrichToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+  const reduced = useReducedMotion();
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label="Enrich with AI"
+      onClick={onToggle}
+      className="flex h-11 items-center gap-2 rounded-lg px-1 text-[13px] font-medium text-ink-secondary"
+    >
+      <Sparkles
+        size={14}
+        aria-hidden
+        className={on ? 'text-accent' : 'text-ink-muted'}
+      />
+      <span className={on ? 'text-ink-secondary' : 'text-ink-muted'}>AI enrich</span>
+      <span
+        aria-hidden
+        className={`relative h-[18px] w-[30px] shrink-0 rounded-full transition-colors ${
+          on ? 'bg-accent' : 'bg-line-strong'
+        }`}
+      >
+        <motion.span
+          layout={!reduced}
+          transition={reduced ? { duration: 0 } : spring}
+          className="absolute top-[3px] h-3 w-3 rounded-full bg-void"
+          style={{ left: on ? 15 : 3 }}
+        />
+      </span>
+    </button>
   );
 }

@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => null);
     const content = typeof body?.content === 'string' ? body.content : '';
+    const skipEnrich = body?.skipEnrich === true;
     const trimmed = content.trim();
     if (!trimmed) {
       return NextResponse.json({ error: 'Content is required' }, { status: 400 });
@@ -47,6 +48,7 @@ export async function POST(request: NextRequest) {
       content, // verbatim — never rewritten
       url,
       source: url ? sourceFromUrl(url) : null,
+      enrichStatus: skipEnrich ? 'skipped' : 'pending',
     });
 
     const response: CreateCaptureResponse = { capture };

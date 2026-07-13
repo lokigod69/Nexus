@@ -183,7 +183,31 @@ fallback chain (Ollama → OpenRouter free → gpt-4o-mini).
 ## Client: model preference
 `src/stores/modelPreference.ts` persists the chosen model id in localStorage (`nexus-model`,
 default `'auto'`) — a client-only preference, not a server setting; it travels with the browser,
-not the account. `ModelPicker` in the header (next to the mute toggle) lists "Auto" + the
-live `/api/models` result; `captureStore.enrich` reads the preference and passes it through
+not the account. `ModelPicker` in the header (last nav item) lists "Auto" + the live
+`/api/models` result; `captureStore.enrich` reads the preference and passes it through
 on every enrich/retry call. This is a testing knob for "which model writes better," not a
 permanent per-project setting.
+
+---
+
+# v2.3 addendum — raw save + mobile fixes (2026-07-14)
+
+## Raw save (skip AI)
+New `EnrichStatus` value `'skipped'` (terminal like done/failed; no DB migration — enrich_status
+is a plain text column). `CreateCaptureRequest.skipEnrich?: boolean` → POST /api/captures creates
+with enrichStatus 'skipped' and the client never fires /enrich. The capture screen has an "AI
+enrich" toggle (default on → button "Capture signal"; off → "Save raw"). Skipped captures render
+with no shimmer and no "failed" text in both cards, each showing an "Enrich with AI" button that
+fires the normal enrich (skipped → pending → done), so a raw save is reversible.
+
+## Registry sync reminder
+The prod projects registry is only populated by the pull CLI's `PUT /api/projects`. Until the
+first successful `npm run pull` against a given deployment, the registry is empty and the routing
+picker shows only "General." ProjectPicker now renders a "run npm run pull" hint when the
+registry is empty. (Not a code fix — inherent to registry-lives-locally; the hint makes it legible.)
+
+## Header order / mobile dropdown
+Header nav order is now: Inbox, Library, MuteToggle, ModelPicker (controls last). ModelPicker
+must be the rightmost item so its `right-0` dropdown anchors to the header's right edge; the menu
+width is capped to `min(14rem, 100vw-1.5rem)`. Both guard against the dropdown clipping off the
+left edge on narrow phones.

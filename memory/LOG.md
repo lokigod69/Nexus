@@ -1,6 +1,28 @@
 # Session Log
 Newest first. Append-only at the top; roll old halves into archive/ past ~300 lines.
 
+## 2026-07-14 — v2.3: raw save (skip AI), mobile model-picker fix, prod registry synced
+- Root-caused the user's "change projects but can't put it anywhere": the PROD projects
+  registry was EMPTY (0 rows) — the registry only reaches the cloud when `npm run pull` runs,
+  and the user had never completed a pull against prod. Fixed immediately by running
+  nexus-pull against prod → 22 projects synced. Added a ProjectPicker empty-state hint
+  ("No projects synced yet. Run npm run pull…") so this can't silently confuse again.
+- Raw save ("save without AI"): new EnrichStatus 'skipped' (no migration — text column);
+  CreateCaptureRequest gains skipEnrich; POST /api/captures honors it; store skips the enrich
+  call; capture screen gets an "AI enrich" toggle (on by default → "Capture signal", off →
+  "Save raw"). Skipped cards render cleanly (no shimmer, no "failed") in both CaptureCard and
+  InboxCard, each offering an "Enrich with AI" button so a raw capture is reversible.
+- Mobile model-picker dropdown was clipping off the left edge: it anchored `right-0` to a
+  trigger sitting mid-header, so a 224px menu overflowed left on a phone. Fix: reordered the
+  header (nav links first, then Mute + ModelPicker last) so the picker's trigger is at the
+  header's right edge and the menu anchors to the screen edge; also capped the menu width to
+  `min(14rem, 100vw-1.5rem)`.
+- Verified: tsc clean, build clean, acceptance 78/78 (added skipEnrich checks), Playwright
+  mobile screenshot at 390px confirms the header fits, the toggle renders, and a raw card
+  shows the Enrich-with-AI affordance.
+
+## 2026-07-13 — Auth/login fixes (phone "Unauthorized" bug) + acceptance safety hole
+
 ## 2026-07-13 — Auth/login fixes (phone "Unauthorized" bug) + acceptance safety hole
 - User reported the phone login looping to "Unauthorized" after entering the password.
   Diagnosed via direct HTTP tests against prod: the CURRENT password (nexus6969) worked

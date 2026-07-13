@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { ChevronDown, RotateCw } from 'lucide-react';
+import { ChevronDown, RotateCw, Sparkles } from 'lucide-react';
 import type { Capture } from '@/types';
 import { GENERAL_PROJECT_SLUG } from '@/types';
 import { useCaptureStore, projectLabel } from '@/stores/captureStore';
@@ -154,9 +154,9 @@ export function CaptureCard({
               </div>
             )}
           </motion.div>
-        ) : capture.enrichStatus === 'done' ? (
+        ) : capture.enrichStatus === 'done' || capture.enrichStatus === 'skipped' ? (
           <motion.div
-            key="done"
+            key="settled"
             initial="hidden"
             animate="show"
             exit={{ opacity: 0, transition: quickFade }}
@@ -206,6 +206,17 @@ export function CaptureCard({
                     disabled={busy}
                     onClick={() => void routeTo([suggested])}
                   />
+                )}
+                {capture.enrichStatus === 'skipped' && (
+                  <button
+                    type="button"
+                    onClick={() => void enrich(capture.id)}
+                    disabled={busy}
+                    className="flex h-11 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-medium text-ink-secondary hover:border-line-strong hover:text-ink disabled:opacity-40"
+                  >
+                    <Sparkles size={13} aria-hidden />
+                    Enrich with AI
+                  </button>
                 )}
                 {pickerToggle}
                 <DeleteButton

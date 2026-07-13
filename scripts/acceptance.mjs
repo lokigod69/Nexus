@@ -83,6 +83,11 @@ check('text has null url', c2?.url === null);
 
 await api('POST', '/api/captures', { content: '   ' }, 400); // empty rejected
 
+// Raw save: skipEnrich → terminal 'skipped' state, no AI, still routable.
+const raw = (await api('POST', '/api/captures', { content: 'raw note, no AI please', skipEnrich: true }))?.capture;
+check('skipEnrich → enrichStatus skipped', raw?.enrichStatus === 'skipped');
+check('skipped capture is inbox + unrouted', raw?.status === 'inbox' && Array.isArray(raw?.projects) && raw.projects.length === 0);
+
 // --- 3. routing (single and multi-target) ----------------------------------
 const routed = (await api('PATCH', `/api/captures/${c1.id}`, { projects: ['test-project', 'ghost-project'] }))?.capture;
 check('status → routed', routed?.status === 'routed');

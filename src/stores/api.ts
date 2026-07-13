@@ -51,9 +51,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  /** POST /api/captures — instant create; enrichment is a separate call. */
-  createCapture(content: string): Promise<CreateCaptureResponse> {
-    const body: CreateCaptureRequest = { content };
+  /** POST /api/captures — instant create; enrichment is a separate call.
+   *  `skipEnrich` saves raw (no AI): the capture starts enrichStatus 'skipped'. */
+  createCapture(content: string, skipEnrich = false): Promise<CreateCaptureResponse> {
+    const body: CreateCaptureRequest = skipEnrich ? { content, skipEnrich } : { content };
     return request<CreateCaptureResponse>('/api/captures', {
       method: 'POST',
       body: JSON.stringify(body),

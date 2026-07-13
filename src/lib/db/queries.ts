@@ -104,6 +104,8 @@ export async function createCapture(data: {
   content: string;
   url: string | null;
   source: string | null;
+  /** 'skipped' for a raw ("no AI") save; defaults to 'pending'. */
+  enrichStatus?: EnrichStatus;
 }): Promise<Capture> {
   await dbReady;
   const row = await db
@@ -115,6 +117,7 @@ export async function createCapture(data: {
       source: data.source,
       tags: '[]',
       projects: '[]',
+      enrichStatus: data.enrichStatus ?? 'pending',
       createdAt: now(),
     })
     .returning()

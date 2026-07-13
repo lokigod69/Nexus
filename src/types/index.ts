@@ -15,7 +15,9 @@
 
 export type CaptureStatus = 'inbox' | 'routed' | 'delivered' | 'archived';
 export type CaptureKind = 'url' | 'text';
-export type EnrichStatus = 'pending' | 'done' | 'failed';
+/** 'skipped' = the user chose "save raw" (no AI). Terminal like done/failed;
+ *  the capture can still be enriched later on demand. */
+export type EnrichStatus = 'pending' | 'done' | 'failed' | 'skipped';
 
 export interface Capture {
   id: string;
@@ -68,9 +70,11 @@ export const GENERAL_PROJECT_SLUG = 'general';
 /** POST /api/captures — instant create; enrichment is a separate call. */
 export interface CreateCaptureRequest {
   content: string; // raw paste; server detects url vs text
+  /** true → "save raw": no AI, capture starts enrichStatus 'skipped'. */
+  skipEnrich?: boolean;
 }
 export interface CreateCaptureResponse {
-  capture: Capture; // enrichStatus 'pending'
+  capture: Capture; // enrichStatus 'pending', or 'skipped' if skipEnrich
 }
 
 /** POST /api/captures/[id]/enrich — scrape (if url) + one AI call. Idempotent:

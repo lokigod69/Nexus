@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { Archive, ChevronDown, RotateCw } from 'lucide-react';
+import { Archive, ChevronDown, RotateCw, Sparkles } from 'lucide-react';
 import type { Capture } from '@/types';
 import { GENERAL_PROJECT_SLUG } from '@/types';
 import { useCaptureStore, projectLabel } from '@/stores/captureStore';
@@ -222,6 +222,17 @@ export function InboxCard({
             className="flex h-11 items-center rounded-lg bg-accent px-4 text-[14px] font-semibold text-accent-ink hover:bg-accent-strong disabled:opacity-40"
           >
             Route to {suggestedLabel}
+          </button>
+        )}
+        {capture.enrichStatus === 'skipped' && (
+          <button
+            type="button"
+            onClick={() => void enrich(capture.id)}
+            disabled={busy}
+            className="flex h-11 items-center gap-1.5 rounded-lg border border-line px-4 text-[14px] font-medium text-ink-secondary hover:border-line-strong hover:text-ink disabled:opacity-40"
+          >
+            <Sparkles size={15} aria-hidden />
+            Enrich with AI
           </button>
         )}
         <button

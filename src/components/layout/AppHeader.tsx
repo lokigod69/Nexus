@@ -32,9 +32,10 @@ export function AppHeader() {
           </span>
         </Link>
 
+        {/* Nav links first, then utility controls. ModelPicker sits last so
+            its dropdown anchors to the header's right edge and can't clip off
+            the left of a narrow phone screen. */}
         <nav className="flex items-center gap-1">
-          <ModelPicker />
-          <MuteToggle />
           <Link
             href="/inbox"
             className={`flex h-11 items-center gap-2 rounded-lg px-3 text-[14px] font-medium ${
@@ -62,6 +63,8 @@ export function AppHeader() {
             <LibraryBig size={16} aria-hidden />
             <span>Library</span>
           </Link>
+          <MuteToggle />
+          <ModelPicker />
         </nav>
         <div className="chrome-edge" aria-hidden />
       </div>

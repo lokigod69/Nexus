@@ -84,6 +84,13 @@ export function ProjectPicker({
       className="overflow-hidden"
     >
       <div className="mt-3 border-t border-line pt-2">
+        {projects.length === 0 && (
+          <p className="px-3 pb-1 pt-1 text-xs leading-relaxed text-ink-muted">
+            No projects synced yet. Run{' '}
+            <span className="font-mono text-ink-secondary">npm run pull</span> on your
+            computer to route into a project brain.
+          </p>
+        )}
         <div
           role="group"
           aria-label="Route to projects"

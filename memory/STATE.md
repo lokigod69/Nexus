@@ -29,7 +29,15 @@ to captures only. Still no embeddings, no 3D, no open-ended chat.
 - cuelume sounds (3 moments + mute), PWA share_target, full reduced-motion support.
 
 ## In progress
-- Nothing mid-flight. v2.2 shipped 2026-07-12 (same day as v2.1).
+- Nothing mid-flight. v2.3 shipped 2026-07-14.
+
+## v2.3 additions (2026-07-14)
+- Raw save: "AI enrich" toggle on the capture screen; off → saves verbatim with no AI
+  (EnrichStatus 'skipped'), still routable, "Enrich with AI" button on the card to reverse it.
+- Fixed the mobile model-picker dropdown clipping off the left edge (header reordered so the
+  picker is rightmost; menu width capped to viewport).
+- PROD project registry synced (was empty → 22 projects); the inbox picker now shows real
+  brains. Picker shows a "run npm run pull" hint when the registry is empty.
 
 ## v2.2 addition (same day)
 - Selectable enrichment model: DeepSeek V4 Flash + DeepSeek V4 Pro added to the registry

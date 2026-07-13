@@ -73,7 +73,7 @@ export function ModelPicker() {
               exit={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.95, y: -4 }}
               transition={reduced ? fade : { ...spring, duration: 0.2 }}
               style={{ transformOrigin: 'top right' }}
-              className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden overscroll-contain rounded-xl border border-line bg-elevated p-1 shadow-lg"
+              className="absolute right-0 top-full z-50 mt-1 w-[min(14rem,calc(100vw-1.5rem))] overflow-hidden overscroll-contain rounded-xl border border-line bg-elevated p-1 shadow-lg"
             >
               <ModelOption
                 label="Auto"
