@@ -32,6 +32,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
   });
   if (!res.ok) {
+    // The auth cookie lapsed or never landed — bounce to the login gate
+    // instead of surfacing a raw "Unauthorized" toast the user can't act on.
+    if (res.status === 401 && typeof window !== 'undefined') {
+      window.location.href = '/';
+      throw new ApiError('Redirecting to login', 401);
+    }
     let message = `Request failed (${res.status})`;
     try {
       const body = (await res.json()) as { error?: string };

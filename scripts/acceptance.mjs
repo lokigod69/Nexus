@@ -9,13 +9,18 @@
 //
 // Delete ./data/acceptance.db before the run for a clean pass. NEXUS_PASSWORD
 // is not in .env.local, so auth is open locally.
+//
+// DELIBERATELY NOT `NEXUS_URL`: that name is the pull CLI's target and is
+// commonly persisted machine-wide (setx) to point at prod for convenience.
+// Reusing it here would let a persisted prod URL silently redirect this
+// suite at production, defeating the NEXUS_LOCAL_DB safety net above.
 
 import { mkdtempSync, writeFileSync, existsSync, readFileSync, readdirSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const BASE = process.env.NEXUS_URL || 'http://localhost:3001';
+const BASE = process.env.NEXUS_ACCEPTANCE_URL || 'http://localhost:3001';
 let failures = 0;
 let n = 0;
 

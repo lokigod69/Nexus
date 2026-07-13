@@ -1,6 +1,34 @@
 # Session Log
 Newest first. Append-only at the top; roll old halves into archive/ past ~300 lines.
 
+## 2026-07-13 — Auth/login fixes (phone "Unauthorized" bug) + acceptance safety hole
+- User reported the phone login looping to "Unauthorized" after entering the password.
+  Diagnosed via direct HTTP tests against prod: the CURRENT password (nexus6969) worked
+  fine server-side — the real bugs were in `src/middleware.ts`'s login page:
+  1. The login form had no hidden fields, so sharing a link while logged out (or after
+     cookie expiry) silently dropped the shared `text`/`url`/`title` — now every non-token
+     query param survives the login round-trip.
+  2. A wrong password re-rendered the same blank form with zero feedback — added an
+     "Incorrect password" message, plus `autocapitalize="off" autocorrect="off"` on the
+     password field (mobile keyboards can silently capitalize password-adjacent inputs).
+  3. Server-side password comparison now `.trim()`s both sides (guards a stray space from
+     a dashboard copy-paste).
+  4. Cookie lifetime extended 30 days → 1 year ("cache my login" — user's explicit ask;
+     changing NEXUS_PASSWORD in Vercel still instantly revokes every existing cookie).
+  5. Client (`src/stores/api.ts`): a 401 now redirects to `/` (the login gate) instead of
+     surfacing a raw "Unauthorized" toast the user can't act on.
+  6. Restyled the login page to match the app's actual design system (was generic blue).
+- Separately found and fixed a real safety hole in MY OWN tooling: `scripts/acceptance.mjs`
+  reused the generic `NEXUS_URL` env var, which had been `setx`'d machine-wide to point at
+  prod for the pull CLI's convenience — silently redirecting acceptance runs at PRODUCTION
+  (confirmed: every check failed with 401 against the real prod password). Renamed to a
+  dedicated `NEXUS_ACCEPTANCE_URL` so a persisted prod URL can never hijack the suite again.
+- Verified: 4 auth-flow scenarios tested directly (no-auth visit, wrong password, share-
+  while-logged-out param preservation, whitespace-padded password match) against a local
+  server; acceptance re-run clean at 75/75 once pointed at localhost again; build clean.
+
+## 2026-07-12 — v2.2: selectable enrichment model (DeepSeek V4 Flash/Pro)
+
 ## 2026-07-12 — v2.2: selectable enrichment model (DeepSeek V4 Flash/Pro)
 - User set the real Vercel password to `nexus6969`; local NEXUS_TOKEN updated via setx to match.
 - Added DeepSeek V4 Flash + DeepSeek V4 Pro (OpenRouter) to the model registry, alongside
